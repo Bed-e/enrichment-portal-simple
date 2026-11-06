@@ -85,10 +85,11 @@ and press **Look up**. A lookup queries three sources one after another, so it c
 seconds. Stop each server with Ctrl+C. If the backend is stopped, the page says the lookup
 service is unavailable.
 
-You can also call the backend directly. A browser or `curl` will do:
+You can also call the backend directly. A browser or `curl.exe` will do (on Windows PowerShell, plain `curl` is a different command that
+prints a confusing summary, so use `curl.exe`; on macOS and Linux, `curl` works):
 
 ```
-curl http://127.0.0.1:5001/api/ip/8.8.8.8
+curl.exe http://127.0.0.1:5001/api/ip/8.8.8.8
 ```
 
 The format of the answer is the API contract in section 7 of [design.md](design.md).

@@ -1,6 +1,6 @@
 # IP Enrichment Portal (Simple) — Design
 
-Status: draft v0.5. M1 to M4 and M5 step 1 are built and merged. M5 steps 2 to 4 (the backend and frontend split) are in one pull request; sections 2 and 6 describe the layout before the split as built through M4, and the layout after the split is in M5. Step 5 (the split's tests) is in its own pull request.
+Status: draft v1.0. M1 to M5 are built and merged. This document describes the app as built: a backend and a frontend that talk through the contract in section 7. Sections 2 and 6 still describe the single-program layout as built through M4 where noted; the layout after the split is in M5.
 Owner: Ben
 
 ---
@@ -33,8 +33,8 @@ A small local web app. An analyst types one IP address, and the app shows two th
 | Three real sources, no fake data in the app | Done (M2) |
 | README, design.md, .gitignore, .gitattributes | Done |
 | Tests make no network calls | Done for the tests that exist (pure logic only) |
-| Tests replay recorded real responses for the sources | **Not yet: M5** |
-| Documented API contract and separate backend and frontend | Contract is written (section 7); the split is built (M5 steps 2 to 4); tests for it are **M5 step 5** |
+| Tests replay recorded real responses for the sources | Done (M5) |
+| Documented API contract and separate backend and frontend | Contract is written (section 7); the split is built and tested (M5) |
 | Configurable port | Works with `--port N` on each program; documented in the README |
 
 ### In scope
@@ -133,7 +133,7 @@ The old design had separate `timeout` and `rate_limited` statuses. Here they col
 ```python
 {
     "ip": "8.8.8.8",
-    "classification": {"category": "global", "explanation": None},
+    "classification": {"category": "global", "explanation": None, "ip": "8.8.8.8"},
     "verdict": {"level": "no_known_bad", "score": 0, "summary": "...", "reasons": ["..."]},
     "sources": [ <source result>, <source result>, <source result> ],
 }
@@ -366,7 +366,7 @@ Write `verdict.py` and its tests, then add the verdict banner and reasons list.
 Styling, README with install and run steps, and a final check on a fresh virtual environment that the instructions work. Read through the code once and make sure I can explain every line.
 *Done when:* a clean install from the README works, and I can walk through the code top to bottom without hand-waving.
 
-**M5: Close the gaps against the brief, then separate backend and frontend (required).**
+**M5: Close the gaps against the brief, then separate backend and frontend (required).** *Done (pull requests #9, #10 and #11).*
 The point of the split is to move code, not rewrite it, so it comes last, after tests protect the sources. Each step below is its own pull request or a small group of them. After each step, tests pass and the page still works.
 
 *New concepts in M5.* Each is explained in plain language when it first appears, and I confirm I understand it before it is used:
@@ -464,7 +464,7 @@ The body is the lookup result dict from section 2, as JSON. All keys shown are a
 ```json
 {
   "ip": "8.8.8.8",
-  "classification": {"category": "global", "explanation": null},
+  "classification": {"category": "global", "explanation": null, "ip": "8.8.8.8"},
   "verdict": {
     "level": "no_known_bad",
     "score": 0,
@@ -495,6 +495,7 @@ The body is the lookup result dict from section 2, as JSON. All keys shown are a
 |---|---|---|
 | `ip` | text | the address that was looked up, in standard form |
 | `classification.category` | text | `global`, `private`, `loopback`, `link_local`, `multicast`, `reserved` or `other_non_global` |
+| `classification.ip` | text | the address in standard form (the same value as the top-level `ip`) |
 | `classification.explanation` | text or null | plain-language explanation; `null` when the category is `global` |
 | `verdict.level` | text | `malicious`, `suspicious`, `no_known_bad`, `unknown` or `not_applicable` |
 | `verdict.score` | whole number | the points total from section 3.4 |
