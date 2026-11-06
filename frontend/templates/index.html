@@ -40,6 +40,10 @@
     {% for source in result.sources %}
       <section class="card">
         <h3>{{ source.display_name }} <span class="status status-{{ source.status }}">{{ source.status }}</span></h3>
+        {# Tells the analyst this answer was reused, and how old it is (design.md section 12). #}
+        {% if source.cached %}
+          <p><em>Cached answer, fetched {{ source.fetched_at }} (UTC).</em></p>
+        {% endif %}
 
         {% if source.status == "ok" %}
           <dl>
