@@ -59,11 +59,13 @@ Never share your key or commit `.env`.
 
 ## Run
 
+With the virtual environment active, run this from the project folder:
+
 ```
-flask --app app run
+flask run
 ```
 
-Then open http://127.0.0.1:5000 in your browser, type an IP address (for example `8.8.8.8`),
+Flask finds `app.py` in the current folder on its own. Then open http://127.0.0.1:5000 in your browser, type an IP address (for example `8.8.8.8`),
 and press **Look up**. A lookup queries three sources one after another, so it can take a few
 seconds. Stop the server with Ctrl+C.
 
