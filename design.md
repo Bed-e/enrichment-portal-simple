@@ -274,7 +274,7 @@ Two routes:
 These are left out on purpose. Some arrive later in other courses.
 
 - **Database.** No saved history, no export. Every lookup is shown once and forgotten.
-- **Caching.** Every lookup is live, with no stored answers reused. This comes in *Reading Unfamiliar Code*.
+- **Caching.** *Now added (section 12):* an in-memory cache per source, so repeat lookups reuse earlier answers. Anything beyond it (a database or a shared cache) is still out.
 - **Privacy guard.** Blocking private values is the topic of *Secure Coding with AI*, and nothing beyond what is already built is added here. **Note:** M1 to M3 already include one simple block: private and reserved addresses are labelled and never sent to the sources (section 3.1). It stays as built, because the code and the pull request history already have it. Anything more is later work.
 - **Optimization.** No threads, no `asyncio`, no rate limiter. Sources are queried one after another.
 
@@ -301,7 +301,7 @@ Stretch goals after M5, one at a time, are listed at the end of section 6.
 
 **D4 — Three sources: InternetDB, RDAP, AbuseIPDB.** Two need no account, which keeps the first run easy. The third teaches key handling once, with a real reputation source, which gives the verdict real evidence. Team Cymru was dropped because it needs DNS queries and a separate library. GreyNoise, VirusTotal and ipinfo were dropped for their tight quotas and extra per-source quirks. All three are real: the running portal never uses fake data.
 
-**D5 — No caching, no rate limiter.** Every lookup is live. One manual lookup at a time stays well inside every limit, so enforcing limits in code would be machinery for a problem I don't have.
+**D5 — No rate limiter; caching added later.** One manual lookup at a time stays well inside every limit, so enforcing limits in code would be machinery for a problem I don't have. Analysts do repeat the same lookups, though, so a simple per-source cache was added afterwards (section 12).
 
 **D6 — Five statuses, with timeouts and rate limits folded into `error`.** The verdict treats all of them the same way (as missing evidence), so splitting them adds no behaviour. The message text says what happened.
 
@@ -329,6 +329,7 @@ Stretch goals after M5, one at a time, are listed at the end of section 6.
 - `python-dotenv`: loads `.env` into the environment so the key isn't in the code.
 - `pytest` (development only): runs the tests.
 - Added in M5, tests only: `json` (standard library) to read the recorded sample files, and `unittest.mock` (standard library) to swap `requests.get` for a fake during a test.
+- Added with the cache (section 12), all standard library: `time` (when an answer was stored), `copy` (store and hand out copies, so nobody changes a stored answer by accident) and `datetime` (the `fetched_at` time shown to users).
 
 **D15 — Educational and non-commercial.** InternetDB's free tier is for non-commercial use, and AbuseIPDB's terms should be checked at sign-up.
 
@@ -507,6 +508,10 @@ The body is the lookup result dict from section 2, as JSON. All keys shown are a
 | `sources[].summary` | object or null | the picked-out fields below; `null` unless `status` is `ok` |
 | `sources[].raw` | object or null | the source's own JSON with its own field names. For `internetdb` and `rdap` it is set only when `status` is `ok`. For `abuseipdb` it is the response's inner `data` object and is also set when `status` is `no_data`. Otherwise `null` |
 | `sources[].error` | text or null | short message when `status` is `error`; `null` otherwise; never contains the API key |
+| `sources[].cached` | true or false | *Added with the cache (section 12).* `true` when this answer was reused from the cache instead of asking the source now |
+| `sources[].fetched_at` | text or null | *Added with the cache.* When the source was really asked, in UTC, like `2026-11-06T22:48:15Z`. On a cached answer it is the time of the original request. `null` when the source was never asked (`skipped` or `not_configured`) |
+
+The two cache fields are additions only: every field above them, and every status code, is unchanged. The example above predates them; real answers include both on every source.
 
 **`summary` keys per source** (any value may be `null` when the source doesn't give it):
 
@@ -671,5 +676,38 @@ def test_internetdb_ok():
 - Check each source's current docs before changing its function, and update section 3.2 and section 7 if anything differs.
 - Never upload or report anything to AbuseIPDB or any other provider. Look-ups only.
 - Never log, print or return the API key.
-- Keep the "Not in this version" list (section 4) out of the code: no database, caching or optimization, and do not extend the private-address block that already exists.
+- Keep the "Not in this version" list (section 4) out of the code: no database or optimization (the cache in section 12 is the one exception), and do not extend the private-address block that already exists.
 - If a requirement here is ambiguous or conflicts with what you find, ask rather than guess.
+
+---
+
+## 12. Caching
+
+Analysts look up the same addresses again and again, and every lookup spends quota at sources with limits. The backend keeps each source's answer for a while and reuses it.
+
+**Where.** A plain Python dict in `backend/cache.py`, inside the running backend. It is empty again after every restart. No file, no database, nothing to gitignore. That is the simplest store, and losing the cache on restart only costs one fresh lookup per address.
+
+**How it fits.** `lookup.py` asks the cache before each source (`_from_cache_or_query`). On a miss it calls the same `query_*` function as before and stores the answer. `sources.py`, `verdict.py` and `api.py` are unchanged.
+
+**The key** is `(source name, address in standard form)`, for example `("rdap", "8.8.8.8")`.
+- One address typed differently uses one entry: `classify_ip` strips spaces and `ipaddress` gives one standard form, so `" 8.8.8.8 "` and `"8.8.8.8"` share an entry. (IPv4 has no upper or lower case. A trailing dot is still rejected with `400`, as before, so it never reaches the cache.)
+- Two different addresses never share an entry, and neither do two sources.
+- The key never contains the API key. The key only travels in a request header.
+
+**Expiry per source.** Checked on each source's own pages on 2026-11-06. None of them ties how long a result may be kept to a `Cache-Control` header, and none rules caching out. AbuseIPDB's terms and ARIN's (where RDAP for many addresses comes from) forbid republishing or reselling the data; a private cache for our own lookups does neither.
+
+| Source | Answer (`ok`) | "Not found" (`no_data`) | Why |
+|---|---|---|---|
+| Shodan InternetDB | 24 hours | 6 hours | Its data is "updated once a week", so a day-old answer is nearly always the current one. No published limit, but it is a free, non-commercial service. |
+| RDAP | 7 days | 1 day | Who owns an address block changes rarely. rdap.org allows about 10 requests per 10 seconds, the tightest per-second limit here. |
+| AbuseIPDB | 6 hours | 1 hour | New abuse reports can arrive within hours, and this is the main "is it bad?" signal, so it is kept the shortest. The free plan allows 1,000 checks a day, the tightest daily limit. "0 reports" (`no_data`) can turn wrong fastest, so it gets the shortest time of all. |
+
+"Not found" is a real answer and may be cached, but for less time than a real answer.
+
+**Never cached:** `error` (a timeout, a network failure, a `429`, a `5xx`, a rejected key, a bad response) and `not_configured` (no key). The next lookup asks again. `skipped` (private addresses) never reaches a source or the cache.
+
+**Telling a cached answer from a fresh one.** A cached "nothing found" can be wrong tomorrow, so the user is always told. Every source in the API answer has `cached` (true or false) and `fetched_at` (when the source was really asked, UTC); see section 7. On the page, a cached card shows "Cached answer, fetched <time> (UTC)." The expiries above keep that age short, but they can't make it zero, so the age is shown instead of hidden.
+
+**Tests.** `backend/tests/test_cache.py` covers a miss, a hit, different spellings, two different addresses, an expired entry, "not found" expiring sooner, an error, a timeout and a missing key not being cached, and the key holding no API key. `backend/tests/conftest.py` empties the cache before every test, so tests can't see each other's answers. All run with the network off.
+
+**Measuring.** `backend/measure_calls.py` runs a fixed list of 26 lookups (repeats, the same address with extra spaces, private addresses, and one address whose InternetDB request always times out) with the network replaced by the recorded samples, and counts requests per source. Run it from `backend/` with `python measure_calls.py`.
