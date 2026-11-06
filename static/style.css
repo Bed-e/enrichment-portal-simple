@@ -1,17 +1,117 @@
-/* Minimal card styling for milestone 2. Real styling comes in milestone 4. */
-body { font-family: sans-serif; max-width: 50rem; margin: 2rem auto; padding: 0 1rem; }
-.card { border: 1px solid #ccc; border-radius: 6px; padding: 0.5rem 1rem; margin: 1rem 0; }
-.status { font-size: 0.75rem; padding: 0.1rem 0.5rem; border-radius: 1rem; background: #eee; }
-.status-ok { background: #d4edda; }
-.status-error { background: #f8d7da; }
-dt { font-weight: bold; }
-dd { margin: 0 0 0.5rem 1rem; }
-pre { overflow-x: auto; background: #f6f6f6; padding: 0.5rem; }
+/* Styles for the IP Enrichment Portal. Plain CSS, no framework, no JavaScript needed.
 
-/* Verdict banner: one colour per level. */
-.verdict { border-radius: 6px; padding: 0.5rem 1rem; margin: 1rem 0; border-left: 8px solid #888; background: #eee; }
-.verdict h2 { margin: 0.25rem 0; }
+   Colours are defined once as CSS variables (custom properties) at the top.
+   A variable is a named value you reuse with var(--name), so changing a colour
+   later means editing one line instead of hunting through the file. */
+:root {
+  --text: #1f2933;
+  --muted: #616e7c;
+  --border: #d3d9e0;
+  --page-bg: #f5f7fa;
+  --card-bg: #ffffff;
+  --accent: #2b6cb0;
+
+  --ok-bg: #d4edda;
+  --error-bg: #f8d7da;
+  --neutral-bg: #e2e3e5;
+}
+
+/* Page layout: a centred column about 50rem wide (1rem = one default text height). */
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--text);
+  background: var(--page-bg);
+  line-height: 1.5;
+  max-width: 50rem;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+h1 { margin-bottom: 1rem; }
+h2, h3 { margin: 0.25rem 0; }
+
+/* The lookup form: input stretches to fill the row, button sits beside it. */
+form { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
+
+input[type="text"] {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  font-size: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+button {
+  padding: 0.5rem 1.25rem;
+  font-size: 1rem;
+  color: #fff;
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+button:hover { filter: brightness(0.9); }
+
+/* Keyboard users need to see where focus is, so keep a clear outline. */
+input:focus-visible, button:focus-visible, summary:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* One card per source. */
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem 1rem 1rem;
+  margin: 1rem 0;
+}
+
+/* Small coloured pill showing the source status (ok, error, ...). */
+.status {
+  font-size: 0.75rem;
+  font-weight: normal;
+  padding: 0.1rem 0.6rem;
+  border-radius: 1rem;
+  background: var(--neutral-bg);
+  vertical-align: middle;
+}
+.status-ok { background: var(--ok-bg); }
+.status-error { background: var(--error-bg); }
+
+/* Key/value details inside a card. */
+dt { font-weight: bold; }
+dd { margin: 0 0 0.5rem 1rem; color: var(--muted); }
+
+/* Raw JSON: long lines scroll sideways instead of breaking the page width. */
+details { margin-top: 0.5rem; }
+summary { cursor: pointer; color: var(--accent); }
+pre {
+  overflow-x: auto;
+  background: var(--page-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.75rem;
+  font-size: 0.85rem;
+}
+
+/* Verdict banner: a thick left border and a tinted background, one colour per level.
+   The level name comes from verdict.py and is added to the class in index.html. */
+.verdict {
+  border-radius: 6px;
+  border-left: 8px solid #888;
+  background: var(--neutral-bg);
+  padding: 0.5rem 1rem;
+  margin: 1rem 0;
+}
+.verdict h2 { font-size: 1.5rem; }
+.verdict ul { margin: 0.5rem 0; padding-left: 1.25rem; }
 .verdict-malicious { background: #f8d7da; border-color: #c0392b; }
 .verdict-suspicious { background: #fff3cd; border-color: #e0a800; }
 .verdict-no_known_bad { background: #d4edda; border-color: #2e8b57; }
-.verdict-unknown, .verdict-not_applicable { background: #e2e3e5; border-color: #888; }
+.verdict-unknown, .verdict-not_applicable { background: var(--neutral-bg); border-color: #888; }
+
+/* Narrow screens (phones): stack the form so the button doesn't squash the input. */
+@media (max-width: 30rem) {
+  form { flex-direction: column; }
+}
