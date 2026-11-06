@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>IP Enrichment Portal</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <h1>IP Enrichment Portal</h1>
+
+  <form method="post" action="/lookup">
+    <input type="text" name="ip" value="{{ ip_text or '' }}" placeholder="8.8.8.8">
+    <button type="submit">Look up</button>
+  </form>
+
+  {% if error %}
+    <p><strong>{{ error }}</strong></p>
+  {% endif %}
+
+  {% if result %}
+    <h2>{{ result.ip }}</h2>
+    {% if result.classification.explanation %}
+      <p>{{ result.classification.category }}: {{ result.classification.explanation }}</p>
+    {% endif %}
+    {# Milestone 1: just show the raw dict. Cards come in milestone 2. #}
+    <pre>{{ result }}</pre>
+  {% endif %}
+</body>
+</html>
