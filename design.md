@@ -23,7 +23,7 @@ A small local web app. An analyst types one IP address, and the app shows two th
 - **At least three real sources**, keyless or with a free key: Shodan InternetDB, RDAP and AbuseIPDB. **No mocks or fake data in the running portal.** Fakes exist only inside tests.
 - **A documented API contract** (section 7) and **a configurable port** (section 9), because two programs cannot listen on the same port and two portals can run on one laptop.
 - **Tests replay recorded real responses and make no network calls** (section 10).
-- **A private GitHub repository** with a README, design.md, .gitignore and .gitattributes (section 8).
+- **A GitHub repository** with a README, design.md, .gitignore and .gitattributes (section 8).
 - **Not in this version:** the list in section 4.
 
 ### Where the project stands
@@ -31,11 +31,9 @@ A small local web app. An analyst types one IP address, and the app shows two th
 | Requirement | State |
 |---|---|
 | Three real sources, no fake data in the app | Done (M2) |
-| README, design.md, .gitignore | Done |
+| README, design.md, .gitignore, .gitattributes | Done |
 | Tests make no network calls | Done for the tests that exist (pure logic only) |
 | Tests replay recorded real responses for the sources | **Not yet: M5** |
-| `.gitattributes` | **Not yet: M5** |
-| Private GitHub repository | **The repository is currently public. Needs changing on GitHub (section 8)** |
 | Documented API contract and separate backend and frontend | Contract is written (section 7); the split is **M5** |
 | Configurable port | Works today with `flask run --port N`; documented in the README in M5 |
 
@@ -91,12 +89,13 @@ enrichment-portal-simple/
 ├─ requirements.txt    flask, requests, python-dotenv, pytest
 ├─ .env.example        ABUSEIPDB_API_KEY=your-key-here
 ├─ .gitignore          .env, venv/, __pycache__/, .pytest_cache/
+├─ .gitattributes      * text=auto
 ├─ CLAUDE.md           instructions for Claude Code
 ├─ design.md           this file
 └─ README.md           how to install, run and test
 ```
 
-Still to add in M5: `.gitattributes`, `tests/samples/`, `tests/test_sources.py` and `tests/test_lookup.py`.
+Still to add in M5: `tests/samples/`, `tests/test_sources.py` and `tests/test_lookup.py`.
 
 Five Python files, each under roughly 150 lines. If a file grows past that, that is a signal to simplify, not to add a framework.
 
@@ -383,13 +382,12 @@ The point of the split is to move code, not rewrite it, so it comes last, after 
 
 *Steps:*
 
-1. **Repository files.** Add `.gitattributes` with the single line `* text=auto` (section 8). Make the GitHub repository private (section 8), which I do on GitHub myself.
-2. **Recorded samples and source tests.** Record the real responses (section 10), add `tests/test_sources.py` and `tests/test_lookup.py`, and check that `pytest` passes with the network turned off.
-3. **Move the files** into `backend/` and `frontend/` as shown below. Fix any `import` lines that break. The existing tests pass when I run `pytest` from inside `backend/`. (`pytest.ini` moves into `backend/`, and the frontend gets its own.)
-4. **Write the backend endpoint** in `api.py`: it calls `lookup()` and returns the dict with `jsonify`, or a 400 with the error shape from section 7. It also catches unexpected errors once, prints the traceback to the terminal and returns a safe 500. Check it by opening `http://127.0.0.1:5001/api/ip/8.8.8.8` directly in the browser, or with `curl`, where the JSON should appear.
-5. **Change the frontend** so `POST /lookup` calls the backend (timeout 30 seconds, since the backend can take up to about 24 seconds when all three sources are slow) and renders the same template with what comes back. The frontend handles the cases in the table in section 7.
-6. **Add the split's tests** (section 10): `test_client` tests for the endpoint, and frontend tests with `requests.get` faked using a recorded real backend answer.
-7. **Update the README** (both programs, ports, tests) and `.env.example` (add `BACKEND_URL`).
+1. **Recorded samples and source tests.** Record the real responses (section 10), add `tests/test_sources.py` and `tests/test_lookup.py`, and check that `pytest` passes with the network turned off.
+2. **Move the files** into `backend/` and `frontend/` as shown below. Fix any `import` lines that break. The existing tests pass when I run `pytest` from inside `backend/`. (`pytest.ini` moves into `backend/`, and the frontend gets its own.)
+3. **Write the backend endpoint** in `api.py`: it calls `lookup()` and returns the dict with `jsonify`, or a 400 with the error shape from section 7. It also catches unexpected errors once, prints the traceback to the terminal and returns a safe 500. Check it by opening `http://127.0.0.1:5001/api/ip/8.8.8.8` directly in the browser, or with `curl`, where the JSON should appear.
+4. **Change the frontend** so `POST /lookup` calls the backend (timeout 30 seconds, since the backend can take up to about 24 seconds when all three sources are slow) and renders the same template with what comes back. The frontend handles the cases in the table in section 7.
+5. **Add the split's tests** (section 10): `test_client` tests for the endpoint, and frontend tests with `requests.get` faked using a recorded real backend answer.
+6. **Update the README** (both programs, ports, tests) and `.env.example` (add `BACKEND_URL`).
 
 *Layout after the split* (files are moved with `git mv` so their history is kept):
 
@@ -403,7 +401,7 @@ enrichment-portal-simple/
 │   ├─ verdict.py          moved unchanged
 │   ├─ pytest.ini          moved
 │   └─ tests/
-│       ├─ samples/        recorded real responses (from step 2)
+│       ├─ samples/        recorded real responses (from step 1)
 │       ├─ test_ip_tools.py   moved unchanged
 │       ├─ test_verdict.py    moved unchanged
 │       ├─ test_sources.py    moved unchanged
@@ -433,7 +431,7 @@ enrichment-portal-simple/
 - How the backend tells its two 400 cases apart (invalid text and IPv6). `classify_ip` raises `ValueError` with a different message for each. Two options are to compare the messages, or to raise two different small error types.
 - Whether `load_dotenv()` finds the root `.env` from inside both folders (it searches upward from the file's location, but I check it rather than assume).
 
-*Done when:* the repository is private and has `.gitattributes`; the source functions are tested against recorded real responses with the network off; and, with both programs running, I get the same results in the browser as at the end of M4. I can call the backend directly with `curl` and get the JSON from the contract. The frontend shows a readable message when the backend is stopped. I can explain what the contract is, which side owns what, and why the key never reaches the frontend.
+*Done when:* the source functions are tested against recorded real responses with the network off; and, with both programs running, I get the same results in the browser as at the end of M4. I can call the backend directly with `curl` and get the JSON from the contract. The frontend shows a readable message when the backend is stopped. I can explain what the contract is, which side owns what, and why the key never reaches the frontend.
 
 ### Stretch goals (only after M5, one at a time)
 
@@ -546,9 +544,7 @@ Any other URL gets Flask's default "not found" page. That page is not part of th
 
 ## 8. Repository and project files
 
-The project lives in a GitHub repository, **which must be private**. Git workflow (branches, pull requests, never committing to `main`) is in `CLAUDE.md`.
-
-**Open item: the repository (`Bed-e/enrichment-portal-simple`) is currently public.** Making it private is a GitHub setting (Settings, then General, then Danger Zone, then Change visibility) and is done by me, not by Claude Code. It is step 1 of M5.
+The project lives in a GitHub repository (`Bed-e/enrichment-portal-simple`). Git workflow (branches, pull requests, never committing to `main`) is in `CLAUDE.md`.
 
 Files the repository must have:
 
@@ -557,7 +553,7 @@ Files the repository must have:
 | `README.md` | Done | What the project is, how to install it, how to run it, and how to run the tests. M5 adds how to change the port and how to run the two programs |
 | `design.md` | Done | This document |
 | `.gitignore` | Done | Tells Git which files never to save: `.env` (it holds the key), `venv/` (the virtual environment), `__pycache__/` and `.pytest_cache/` (Python's and pytest's temporary files) |
-| `.gitattributes` | **To add in M5** | Tells Git how to treat files. It contains one line, `* text=auto`. Windows ends each line of text with two invisible characters and Mac and Linux with one, and mixing them makes Git show whole files as changed when only the line endings differ. This line makes Git store text with one style and convert it to the local style on each machine, so diffs stay clean. It does not change my Python code at all. |
+| `.gitattributes` | Done | Tells Git how to treat files. It contains one line, `* text=auto`. Windows ends each line of text with two invisible characters and Mac and Linux with one, and mixing them makes Git show whole files as changed when only the line endings differ. This line makes Git store text with one style and convert it to the local style on each machine, so diffs stay clean. It does not change my Python code at all. |
 
 Also in the repository: `requirements.txt`, `pytest.ini`, `.env.example` (fake placeholder values only), `CLAUDE.md`, and (from M5) the `tests/samples/` files.
 
@@ -675,5 +671,4 @@ def test_internetdb_ok():
 - Never upload or report anything to AbuseIPDB or any other provider. Look-ups only.
 - Never log, print or return the API key.
 - Keep the "Not in this version" list (section 4) out of the code: no database, caching or optimization, and do not extend the private-address block that already exists.
-- Changing the repository's visibility is my job on GitHub, not yours.
 - If a requirement here is ambiguous or conflicts with what you find, ask rather than guess.
