@@ -1,8 +1,13 @@
 import traceback
 
+from dotenv import load_dotenv
 from flask import Flask, render_template, request
 
 from lookup import lookup
+
+# Read the .env file (if there is one) into environment variables, so
+# sources.py can find ABUSEIPDB_API_KEY without it being written in the code.
+load_dotenv()
 
 app = Flask(__name__)
 

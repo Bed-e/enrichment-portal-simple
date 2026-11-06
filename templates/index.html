@@ -22,8 +22,48 @@
     {% if result.classification.explanation %}
       <p>{{ result.classification.category }}: {{ result.classification.explanation }}</p>
     {% endif %}
-    {# Milestone 1: just show the raw dict. Cards come in milestone 2. #}
-    <pre>{{ result }}</pre>
+
+    {# Milestone 3 will add the verdict banner here. #}
+
+    {# One card per source. Jinja autoescapes {{ }}, so text from outside sources is safe. #}
+    {% for source in result.sources %}
+      <section class="card">
+        <h3>{{ source.display_name }} <span class="status status-{{ source.status }}">{{ source.status }}</span></h3>
+
+        {% if source.status == "ok" %}
+          <dl>
+            {% for key, value in source.summary.items() %}
+              <dt>{{ key }}</dt>
+              <dd>
+                {% if value is iterable and value is not string %}
+                  {{ value | join(", ") if value else "none" }}
+                {% elif value is none %}
+                  not provided
+                {% else %}
+                  {{ value }}
+                {% endif %}
+              </dd>
+            {% endfor %}
+          </dl>
+        {% elif source.status == "no_data" %}
+          <p>The source answered but has no data on this IP.</p>
+        {% elif source.status == "error" %}
+          <p>Could not get an answer: {{ source.error }}</p>
+        {% elif source.status == "not_configured" %}
+          <p>Not configured: no API key is set, so this source was not queried.</p>
+        {% elif source.status == "skipped" %}
+          <p>Skipped: private or reserved addresses are never sent to outside services.</p>
+        {% endif %}
+
+        {# <details> collapses by itself, so no JavaScript is needed. #}
+        {% if source.raw %}
+          <details>
+            <summary>Raw response</summary>
+            <pre>{{ source.raw | tojson(indent=2) }}</pre>
+          </details>
+        {% endif %}
+      </section>
+    {% endfor %}
   {% endif %}
 </body>
 </html>
