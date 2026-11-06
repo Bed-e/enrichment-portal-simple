@@ -112,9 +112,15 @@ cd backend
 pytest
 ```
 
-The backend tests cover the pure logic (IP classification and verdict scoring) and the source
-functions, which replay real responses saved in `backend/tests/samples/`. They don't make
-network calls. The frontend has no tests yet.
+```
+cd frontend
+pytest
+```
+
+The backend tests cover the pure logic (IP classification and verdict scoring), the source
+functions (which replay real responses saved in `backend/tests/samples/`) and the API endpoint.
+The frontend tests replay a real backend answer saved in `frontend/tests/samples/`. No test makes
+network calls.
 
 ## Project layout
 
@@ -129,3 +135,4 @@ network calls. The frontend has no tests yet.
 | `frontend/app.py` | The web page routes: shows the form and calls the backend |
 | `frontend/templates/index.html` | The page |
 | `frontend/static/style.css` | The styling |
+| `frontend/tests/` | Automated tests, and the recorded backend answer they replay |

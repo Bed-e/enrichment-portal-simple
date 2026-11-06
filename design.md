@@ -1,6 +1,6 @@
 # IP Enrichment Portal (Simple) — Design
 
-Status: draft v0.5. M1 to M4 and M5 step 1 are built and merged. M5 steps 2 to 4 (the backend and frontend split) are in one pull request; sections 2 and 6 describe the layout before the split as built through M4, and the layout after the split is in M5. Steps 5 and 6 are still to do.
+Status: draft v0.5. M1 to M4 and M5 step 1 are built and merged. M5 steps 2 to 4 (the backend and frontend split) are in one pull request; sections 2 and 6 describe the layout before the split as built through M4, and the layout after the split is in M5. Step 5 (the split's tests) is in its own pull request.
 Owner: Ben
 
 ---
@@ -386,7 +386,7 @@ The point of the split is to move code, not rewrite it, so it comes last, after 
 2. *(Done, in one pull request with steps 3 and 4, because the page does not run between them.)* **Move the files** into `backend/` and `frontend/` as shown below. Fix any `import` lines that break. The existing tests pass when I run `pytest` from inside `backend/`. (`pytest.ini` moves into `backend/`, and the frontend gets its own.)
 3. *(Done.)* **Write the backend endpoint** in `api.py`: it calls `lookup()` and returns the dict with `jsonify`, or a 400 with the error shape from section 7. It also catches unexpected errors once, prints the traceback to the terminal and returns a safe 500. Check it by opening `http://127.0.0.1:5001/api/ip/8.8.8.8` directly in the browser, or with `curl`, where the JSON should appear.
 4. *(Done.)* **Change the frontend** so `POST /lookup` calls the backend (timeout 30 seconds, since the backend can take up to about 24 seconds when all three sources are slow) and renders the same template with what comes back. The frontend handles the cases in the table in section 7.
-5. **Add the split's tests** (section 10): `test_client` tests for the endpoint, and frontend tests with `requests.get` faked using a recorded real backend answer.
+5. *(Done.)* **Add the split's tests** (section 10): `test_client` tests for the endpoint, and frontend tests with `requests.get` faked using a recorded real backend answer.
 6. **Update the README** (both programs, ports, tests) and `.env.example` (add `BACKEND_URL`). *(Done early, in the same pull request as steps 2 to 4, so the docs match the code when it merges.)*
 
 *Layout after the split* (files are moved with `git mv` so their history is kept):
