@@ -23,7 +23,18 @@
       <p>{{ result.classification.category }}: {{ result.classification.explanation }}</p>
     {% endif %}
 
-    {# Milestone 3 will add the verdict banner here. #}
+    {# The banner colour comes from the verdict level via a CSS class (verdict-malicious, etc.). #}
+    <section class="verdict verdict-{{ result.verdict.level }}">
+      <h2>{{ result.verdict.level | replace("_", " ") | title }}</h2>
+      <p>{{ result.verdict.summary }}</p>
+      {% if result.verdict.reasons %}
+        <ul>
+          {% for reason in result.verdict.reasons %}
+            <li>{{ reason }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </section>
 
     {# One card per source. Jinja autoescapes {{ }}, so text from outside sources is safe. #}
     {% for source in result.sources %}

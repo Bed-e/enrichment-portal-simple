@@ -7,3 +7,11 @@ body { font-family: sans-serif; max-width: 50rem; margin: 2rem auto; padding: 0 
 dt { font-weight: bold; }
 dd { margin: 0 0 0.5rem 1rem; }
 pre { overflow-x: auto; background: #f6f6f6; padding: 0.5rem; }
+
+/* Verdict banner: one colour per level. */
+.verdict { border-radius: 6px; padding: 0.5rem 1rem; margin: 1rem 0; border-left: 8px solid #888; background: #eee; }
+.verdict h2 { margin: 0.25rem 0; }
+.verdict-malicious { background: #f8d7da; border-color: #c0392b; }
+.verdict-suspicious { background: #fff3cd; border-color: #e0a800; }
+.verdict-no_known_bad { background: #d4edda; border-color: #2e8b57; }
+.verdict-unknown, .verdict-not_applicable { background: #e2e3e5; border-color: #888; }
