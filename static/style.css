@@ -1,0 +1,9 @@
+/* Minimal card styling for milestone 2. Real styling comes in milestone 4. */
+body { font-family: sans-serif; max-width: 50rem; margin: 2rem auto; padding: 0 1rem; }
+.card { border: 1px solid #ccc; border-radius: 6px; padding: 0.5rem 1rem; margin: 1rem 0; }
+.status { font-size: 0.75rem; padding: 0.1rem 0.5rem; border-radius: 1rem; background: #eee; }
+.status-ok { background: #d4edda; }
+.status-error { background: #f8d7da; }
+dt { font-weight: bold; }
+dd { margin: 0 0 0.5rem 1rem; }
+pre { overflow-x: auto; background: #f6f6f6; padding: 0.5rem; }

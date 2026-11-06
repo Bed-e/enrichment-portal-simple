@@ -1,5 +1,5 @@
 from ip_tools import classify_ip
-from sources import query_internetdb
+from sources import query_abuseipdb, query_internetdb, query_rdap
 
 
 def _skipped(name, display_name):
@@ -20,8 +20,13 @@ def lookup(ip_text):
 
     if classification["category"] != "global":
         # Never send private/reserved addresses to outside services.
-        sources = [_skipped("internetdb", "Shodan InternetDB")]
+        sources = [
+            _skipped("internetdb", "Shodan InternetDB"),
+            _skipped("rdap", "RDAP (registration)"),
+            _skipped("abuseipdb", "AbuseIPDB"),
+        ]
     else:
-        sources = [query_internetdb(ip)]
+        # One after another (no threads): simple, and fast enough for one IP.
+        sources = [query_internetdb(ip), query_rdap(ip), query_abuseipdb(ip)]
 
     return {"ip": ip, "classification": classification, "sources": sources}
