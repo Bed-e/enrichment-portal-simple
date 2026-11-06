@@ -1,5 +1,6 @@
 from ip_tools import classify_ip
 from sources import query_abuseipdb, query_internetdb, query_rdap
+from verdict import score_verdict
 
 
 def _skipped(name, display_name):
@@ -29,4 +30,11 @@ def lookup(ip_text):
         # One after another (no threads): simple, and fast enough for one IP.
         sources = [query_internetdb(ip), query_rdap(ip), query_abuseipdb(ip)]
 
-    return {"ip": ip, "classification": classification, "sources": sources}
+    verdict = score_verdict(classification, sources)
+
+    return {
+        "ip": ip,
+        "classification": classification,
+        "verdict": verdict,
+        "sources": sources,
+    }
