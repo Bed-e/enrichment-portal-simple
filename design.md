@@ -1,6 +1,6 @@
 # IP Enrichment Portal (Simple) — Design
 
-Status: draft v0.4. M1 to M4 are built and merged, and this document describes them as built. Everything in the brief that the code does not yet do is planned in M5.
+Status: draft v0.5. M1 to M4 and M5 step 1 are built and merged. M5 steps 2 to 4 (the backend and frontend split) are in one pull request; sections 2 and 6 describe the layout before the split as built through M4, and the layout after the split is in M5. Steps 5 and 6 are still to do.
 Owner: Ben
 
 ---
@@ -34,8 +34,8 @@ A small local web app. An analyst types one IP address, and the app shows two th
 | README, design.md, .gitignore, .gitattributes | Done |
 | Tests make no network calls | Done for the tests that exist (pure logic only) |
 | Tests replay recorded real responses for the sources | **Not yet: M5** |
-| Documented API contract and separate backend and frontend | Contract is written (section 7); the split is **M5** |
-| Configurable port | Works today with `flask run --port N`; documented in the README in M5 |
+| Documented API contract and separate backend and frontend | Contract is written (section 7); the split is built (M5 steps 2 to 4); tests for it are **M5 step 5** |
+| Configurable port | Works with `--port N` on each program; documented in the README |
 
 ### In scope
 
@@ -382,12 +382,12 @@ The point of the split is to move code, not rewrite it, so it comes last, after 
 
 *Steps:*
 
-1. **Recorded samples and source tests.** Record the real responses (section 10), add `tests/test_sources.py` and `tests/test_lookup.py`, and check that `pytest` passes with the network turned off.
-2. **Move the files** into `backend/` and `frontend/` as shown below. Fix any `import` lines that break. The existing tests pass when I run `pytest` from inside `backend/`. (`pytest.ini` moves into `backend/`, and the frontend gets its own.)
-3. **Write the backend endpoint** in `api.py`: it calls `lookup()` and returns the dict with `jsonify`, or a 400 with the error shape from section 7. It also catches unexpected errors once, prints the traceback to the terminal and returns a safe 500. Check it by opening `http://127.0.0.1:5001/api/ip/8.8.8.8` directly in the browser, or with `curl`, where the JSON should appear.
-4. **Change the frontend** so `POST /lookup` calls the backend (timeout 30 seconds, since the backend can take up to about 24 seconds when all three sources are slow) and renders the same template with what comes back. The frontend handles the cases in the table in section 7.
+1. *(Done, pull request #9.)* **Recorded samples and source tests.** Record the real responses (section 10), add `tests/test_sources.py` and `tests/test_lookup.py`, and check that `pytest` passes with the network turned off.
+2. *(Done, in one pull request with steps 3 and 4, because the page does not run between them.)* **Move the files** into `backend/` and `frontend/` as shown below. Fix any `import` lines that break. The existing tests pass when I run `pytest` from inside `backend/`. (`pytest.ini` moves into `backend/`, and the frontend gets its own.)
+3. *(Done.)* **Write the backend endpoint** in `api.py`: it calls `lookup()` and returns the dict with `jsonify`, or a 400 with the error shape from section 7. It also catches unexpected errors once, prints the traceback to the terminal and returns a safe 500. Check it by opening `http://127.0.0.1:5001/api/ip/8.8.8.8` directly in the browser, or with `curl`, where the JSON should appear.
+4. *(Done.)* **Change the frontend** so `POST /lookup` calls the backend (timeout 30 seconds, since the backend can take up to about 24 seconds when all three sources are slow) and renders the same template with what comes back. The frontend handles the cases in the table in section 7.
 5. **Add the split's tests** (section 10): `test_client` tests for the endpoint, and frontend tests with `requests.get` faked using a recorded real backend answer.
-6. **Update the README** (both programs, ports, tests) and `.env.example` (add `BACKEND_URL`).
+6. **Update the README** (both programs, ports, tests) and `.env.example` (add `BACKEND_URL`). *(Done early, in the same pull request as steps 2 to 4, so the docs match the code when it merges.)*
 
 *Layout after the split* (files are moved with `git mv` so their history is kept):
 
@@ -550,7 +550,7 @@ Files the repository must have:
 
 | File | State | What it is for |
 |---|---|---|
-| `README.md` | Done | What the project is, how to install it, how to run it, and how to run the tests. M5 adds how to change the port and how to run the two programs |
+| `README.md` | Done | What the project is, how to install it, how to run both programs, how to change the port, and how to run the tests |
 | `design.md` | Done | This document |
 | `.gitignore` | Done | Tells Git which files never to save: `.env` (it holds the key), `venv/` (the virtual environment), `__pycache__/` and `.pytest_cache/` (Python's and pytest's temporary files) |
 | `.gitattributes` | Done | Tells Git how to treat files. It contains one line, `* text=auto`. Windows ends each line of text with two invisible characters and Mac and Linux with one, and mixing them makes Git show whole files as changed when only the line endings differ. This line makes Git store text with one style and convert it to the local style on each machine, so diffs stay clean. It does not change my Python code at all. |

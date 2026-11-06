@@ -45,8 +45,8 @@ Run these from the project folder.
 
 ## Configure (optional)
 
-Settings that must not live in the code, like API keys, go in a `.env` file. It is listed in
-`.gitignore`, so it is never committed.
+Settings that must not live in the code, like API keys, go in a `.env` file in the project
+folder (the top one, next to this README). It is listed in `.gitignore`, so it is never committed.
 
 1. Copy the template:
 
@@ -55,41 +55,77 @@ Settings that must not live in the code, like API keys, go in a `.env` file. It 
 
 2. Open `.env` and replace `your-key-here` with your real AbuseIPDB key.
 
+3. `BACKEND_URL` tells the frontend where the backend is. The default already matches the
+   commands below, so change it only if you change the backend's port (see "Change the port").
+
 Never share your key or commit `.env`.
 
 ## Run
 
-With the virtual environment active, run this from the project folder:
+The app is two programs: a **backend** (an API that queries the sources and returns JSON) and a
+**frontend** (the web page, which only talks to the backend). Run each in its own terminal, with
+the virtual environment active in both.
+
+Terminal 1, the backend (port 5001):
 
 ```
-flask run
+cd backend
+flask --app api run --port 5001
 ```
 
-Flask finds `app.py` in the current folder on its own. Then open http://127.0.0.1:5000 in your browser, type an IP address (for example `8.8.8.8`),
+Terminal 2, the frontend (port 5000):
+
+```
+cd frontend
+flask --app app run --port 5000
+```
+
+Then open http://127.0.0.1:5000 in your browser, type an IP address (for example `8.8.8.8`),
 and press **Look up**. A lookup queries three sources one after another, so it can take a few
-seconds. Stop the server with Ctrl+C.
+seconds. Stop each server with Ctrl+C. If the backend is stopped, the page says the lookup
+service is unavailable.
 
-If something goes wrong, details are printed in the terminal where the server is running. The web
-page only shows a short, safe message.
+You can also call the backend directly. A browser or `curl` will do:
+
+```
+curl http://127.0.0.1:5001/api/ip/8.8.8.8
+```
+
+The format of the answer is the API contract in section 7 of [design.md](design.md).
+
+If something goes wrong, details are printed in the terminal of the program that failed. The web
+page only shows a short, safe message. Only the backend reads the AbuseIPDB key.
+
+### Change the port
+
+Two programs can't listen on the same port. Change the number after `--port`. If you change the
+backend's port, set `BACKEND_URL` in `.env` to match, for example `BACKEND_URL=http://127.0.0.1:5003`.
+To run a second copy of the portal on the same computer, give it different ports for both
+programs (for example 5003 for the backend and 5002 for the frontend).
 
 ## Test
 
+Each program has its own tests. Run `pytest` from inside its folder:
+
 ```
+cd backend
 pytest
 ```
 
-The tests cover the pure logic (IP classification and the verdict scoring). They don't make
-network calls.
+The backend tests cover the pure logic (IP classification and verdict scoring) and the source
+functions, which replay real responses saved in `backend/tests/samples/`. They don't make
+network calls. The frontend has no tests yet.
 
 ## Project layout
 
 | File | What it does |
 | --- | --- |
-| `app.py` | Flask routes: the form page and the lookup |
-| `lookup.py` | Runs one lookup: classify the IP, query sources, score the verdict |
-| `ip_tools.py` | Checks whether an address is valid, public, private or reserved |
-| `sources.py` | One function per source (Shodan InternetDB, RDAP, AbuseIPDB) |
-| `verdict.py` | Turns the source results into a verdict using a simple points score |
-| `templates/index.html` | The page |
-| `static/style.css` | The styling |
-| `tests/` | Automated tests |
+| `backend/api.py` | The backend: one endpoint, `GET /api/ip/<ip>`, that returns JSON |
+| `backend/lookup.py` | Runs one lookup: classify the IP, query sources, score the verdict |
+| `backend/ip_tools.py` | Checks whether an address is valid, public, private or reserved |
+| `backend/sources.py` | One function per source (Shodan InternetDB, RDAP, AbuseIPDB) |
+| `backend/verdict.py` | Turns the source results into a verdict using a simple points score |
+| `backend/tests/` | Automated tests, and the recorded responses they replay |
+| `frontend/app.py` | The web page routes: shows the form and calls the backend |
+| `frontend/templates/index.html` | The page |
+| `frontend/static/style.css` | The styling |
