@@ -1,6 +1,6 @@
 # IP Enrichment Portal (Simple) — Design
 
-Status: draft v1.1. M1 to M5 are built and merged. M6 (a graded 0 to 100 certainty in the verdict) is designed here and not built yet. Sections 13 and 14 describe the MCP server and the Skill, which M6 touches only in small ways (M6, step 3). This document describes the app as built: a backend and a frontend that talk through the contract in section 7. Sections 2 and 6 still describe the single-program layout as built through M4 where noted; the layout after the split is in M5.
+Status: draft v1.1. M1 to M5 are built and merged. M6 (a graded 0 to 100 certainty in the verdict) is built, in its own pull request. Sections 13 and 14 describe the MCP server and the Skill, which M6 touched only in small ways (M6, step 3). This document describes the app as built: a backend and a frontend that talk through the contract in section 7. Sections 2 and 6 still describe the single-program layout as built through M4 where noted; the layout after the split is in M5.
 Owner: Ben
 
 ---
@@ -459,7 +459,7 @@ enrichment-portal-simple/
 
 *Done when:* the source functions are tested against recorded real responses with the network off; and, with both programs running, I get the same results in the browser as at the end of M4. I can call the backend directly with `curl` and get the JSON from the contract. The frontend shows a readable message when the backend is stopped. I can explain what the contract is, which side owns what, and why the key never reaches the frontend.
 
-**M6: Graded certainty.** *Designed here, not built yet.*
+**M6: Graded certainty.** *Built, in its own pull request.*
 Change the verdict from flat points to a 0 to 100 certainty (section 3.4, D36). No new files, libraries or concepts: one multiplication, `round`, `min`, and `None` for "no evidence". Steps, each on a branch and a pull request:
 
 1. **Update `verdict.py`.** New constants, scaled AbuseIPDB points, the cap, the new level thresholds, `score: None` in both early exits, and reason lines that show the points.
@@ -720,7 +720,7 @@ def test_internetdb_ok():
 - Never upload or report anything to AbuseIPDB or any other provider. Look-ups only.
 - Never log, print or return the API key.
 - Keep the "Not in this version" list (section 4) out of the code: no database or optimization (the cache in section 12 is the one exception), and do not extend the private-address block that already exists.
-- M6 (the graded certainty) is designed in sections 3.4 and 7 and D36 but not yet built. Build it as its own branch and pull request, and keep the scoring to the formula in section 3.4: no classes, no new libraries. The weights and thresholds are placeholders, kept as constants at the top of `verdict.py`.
+- M6 (the graded certainty) is built as described in sections 3.4 and 7 and D36, as its own branch and pull request. Keep the scoring to the formula in section 3.4: no classes, no new libraries. The weights and thresholds are placeholders, kept as constants at the top of `verdict.py`.
 - If a requirement here is ambiguous or conflicts with what you find, ask rather than guess.
 
 ---
