@@ -75,6 +75,10 @@
         {% endif %}
       </section>
     {% endfor %}
+
+    {# Fixed text, not data from the backend: the API answer is unchanged (design.md section 12). #}
+    <p><em>Answers may be reused for a while to save quota: up to 24 hours for Shodan InternetDB,
+      7 days for RDAP and 6 hours for AbuseIPDB (1 hour if it found no reports).</em></p>
   {% endif %}
 </body>
 </html>

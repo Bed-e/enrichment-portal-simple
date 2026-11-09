@@ -123,6 +123,11 @@ functions (which replay real responses saved in `backend/tests/samples/`) and th
 The frontend tests replay a real backend answer saved in `frontend/tests/samples/`. No test makes
 network calls.
 
+To count how many requests a fixed run of 26 lookups sends to each source (no network, no quota
+spent), run `python measure_calls.py` from inside `backend/`. The backend keeps each source's
+answer for a while and reuses it; the expiry times and reasons are in section 12 of
+[design.md](design.md).
+
 ## Project layout
 
 | File | What it does |
@@ -132,6 +137,8 @@ network calls.
 | `backend/ip_tools.py` | Checks whether an address is valid, public, private or reserved |
 | `backend/sources.py` | One function per source (Shodan InternetDB, RDAP, AbuseIPDB) |
 | `backend/verdict.py` | Turns the source results into a verdict using a simple points score |
+| `backend/cache.py` | Keeps each source's answer in memory for a while, so repeat lookups reuse it |
+| `backend/measure_calls.py` | Counts requests per source for a fixed run of lookups, with no network |
 | `backend/tests/` | Automated tests, and the recorded responses they replay |
 | `frontend/app.py` | The web page routes: shows the form and calls the backend |
 | `frontend/templates/index.html` | The page |
