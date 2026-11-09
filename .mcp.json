@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "ioc-portal": {
+      "command": "venv/Scripts/python.exe",
+      "args": ["mcp_server/server.py"],
+      "env": { "PORTAL_URL": "http://127.0.0.1:5001" }
+    }
+  }
+}
