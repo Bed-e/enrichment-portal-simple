@@ -175,6 +175,16 @@ Start Claude Desktop again, then ask something like "What's the verdict on 8.8.8
 in this config: only the backend reads the AbuseIPDB key, from `.env`. The server's log lines go to
 stderr, which Claude Desktop saves in its MCP log files.
 
+**Connect it to Claude Code.** The project already includes a `.mcp.json` file in its root folder.
+Claude Code reads that file when you open the project and offers the `ioc-portal` server, which
+the `/ioc-triage` skill needs. Three things to know:
+
+- Run `pip install -r requirements.txt` first, and keep the backend running on port 5001.
+- The file's `command` is the Windows path `venv/Scripts/python.exe`. On macOS or Linux, change it
+  to `venv/bin/python`.
+- You may be asked to approve the server the first time. It holds no secrets: only the backend
+  reads the AbuseIPDB key.
+
 ## Project layout
 
 | File | What it does |
