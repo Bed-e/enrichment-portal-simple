@@ -79,7 +79,9 @@ def lookup_ip(ip: str) -> dict:
     Out: the address, its category (global, private, loopback, link_local, multicast, reserved,
     other_non_global), the verdict (level: malicious, suspicious, no_known_bad, unknown or
     not_applicable; score; summary; reasons) and, for each source, its status, key fields
-    (summary) and any error message.
+    (summary) and any error message. The score is the certainty of malicious activity from 0 to
+    100, or null when there is no evidence (level unknown or not_applicable). A score of 0 does
+    not mean safe, only that the sources asked found nothing.
 
     Sources: Shodan InternetDB (open ports, tags, CVEs), RDAP (who owns the address; never
     changes the verdict) and AbuseIPDB (abuse reports).

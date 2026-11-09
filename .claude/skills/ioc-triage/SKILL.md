@@ -37,8 +37,8 @@ Use only the `lookup_ip` tool of the `ioc-portal` MCP server. In Claude Code it 
 
 | Tool answer | Verdict cell | Score | Key evidence | Source problems |
 |---|---|---|---|---|
-| A normal result | `verdict.level` as returned | `verdict.score` | `verdict.reasons` joined with `; `, or `none` if empty | see below |
-| A normal result with level `not_applicable` | `not_applicable` | `verdict.score` | `<category> address` (e.g. `private address`) | `all skipped (not sent out)` |
+| A normal result | `verdict.level` as returned | `verdict.score`, or `-` when it is `null` (levels `unknown` and `not_applicable`) | `verdict.reasons` joined with `; `, or `none` if empty | see below |
+| A normal result with level `not_applicable` | `not_applicable` | `-` (the score is `null`) | `<category> address` (e.g. `private address`) | `all skipped (not sent out)` |
 | Tool error "That is not a valid IPv4 address..." or "IPv6 is not supported..." or any other portal message about the input | `refused` | `-` | `-` | `-` |
 | Tool error "Could not reach the portal at ..." | `not_checked` | `-` | `-` | `portal unreachable` |
 | Any other tool error (internal error, unexpected answer) | `not_checked` | `-` | `-` | the tool's error message |

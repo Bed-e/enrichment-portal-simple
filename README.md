@@ -183,7 +183,7 @@ stderr, which Claude Desktop saves in its MCP log files.
 | `backend/lookup.py` | Runs one lookup: classify the IP, query sources, score the verdict |
 | `backend/ip_tools.py` | Checks whether an address is valid, public, private or reserved |
 | `backend/sources.py` | One function per source (Shodan InternetDB, RDAP, AbuseIPDB) |
-| `backend/verdict.py` | Turns the source results into a verdict using a simple points score |
+| `backend/verdict.py` | Turns the source results into a verdict: a 0 to 100 certainty of malicious activity, plus a level label |
 | `backend/cache.py` | Keeps each source's answer in memory for a while, so repeat lookups reuse it |
 | `backend/measure_calls.py` | Counts requests per source for a fixed run of lookups, with no network |
 | `backend/tests/` | Automated tests, and the recorded responses they replay |
