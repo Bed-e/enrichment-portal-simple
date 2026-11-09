@@ -768,3 +768,21 @@ Details (the status code, the exception) go to the log, never into the tool's an
 **D32 — An exception to section 11, approved through the pull request.** Section 11 asks for new libraries, decorators other than `@app.route`, and type-heavy code to be run past Ben first. The server needs the `mcp` library, its `@mcp.tool()` decorator and type hints (the SDK builds the input schema from them). They stay inside `mcp_server/`, and the pull request that adds them is where Ben approves or rejects them.
 
 **Running and connecting it** is in the README ("MCP server").
+
+---
+
+## 14. Triage Skill
+
+Analysts triage a list of indicators the same way every time. `.claude/skills/ioc-triage/SKILL.md` is a Skill (a set of written instructions that Claude loads when a request matches its description) that makes Claude follow one procedure: split a pasted list, drop repeats, call `lookup_ip` (section 13) once per value in the user's order, and answer in four fixed sections (Results table, Counts per verdict, Refused values, Lookups).
+
+**Nothing else changes.** It is one Markdown file. The API contract (section 7), the backend, the frontend and the MCP server are untouched, and it uses no library.
+
+**Decisions, each with its reason:**
+
+**D33 — Only `lookup_ip`, and only the values the user gave.** Every verdict, score and piece of evidence comes from the portal, so the answer is the same whoever asks. No web search, no other source, no added, "related" or corrected values.
+
+**D34 — The tool decides what is refused.** Every value goes to `lookup_ip` exactly as given, and the server's own check (D24) refuses domains, hashes, URLs, ranges and IPv6 without making a request. Claude never judges validity itself and never retries a refused value in another form.
+
+**D35 — Fixed output and fixed failure wording.** A failing source stays in its row under "Source problems" (`error`, `not_configured`, `no_data`), as in section 7's rules. If the portal is unreachable, the Skill stops and marks the rest `not_checked`, because every later call would fail the same way.
+
+**Where it loads.** The Code tab finds it in `.claude/skills/`. Claude Desktop chat cannot read the repository, so a user uploads the `ioc-triage` folder as a ZIP there.
