@@ -151,8 +151,11 @@ hand. It needs Node.js (for `npx`). From the project folder:
 npx @modelcontextprotocol/inspector venv\Scripts\python.exe mcp_server\server.py
 ```
 
-**Connect it to Claude Desktop.** Open `%APPDATA%\Claude\claude_desktop_config.json` (on Windows;
-Claude Desktop's Settings > Developer > Edit Config opens it) and add the server. Replace
+**Connect it to Claude Desktop.** First quit Claude Desktop fully (system tray icon, then Quit):
+while it is running it can overwrite the config file and drop your change. Then, on Windows, open
+`%APPDATA%\Claude\claude_desktop_config.json`. If you installed Claude Desktop from the Microsoft
+Store, the file is at `%LOCALAPPDATA%\Claude-Data\claude_<id>\claude_desktop_config.json` instead.
+Add the server and save. Replace
 `C:\\path\\to` with where this project is, using double backslashes. `PORTAL_URL` is the backend's
 address; change the port if you run the backend on another one.
 
@@ -168,7 +171,7 @@ address; change the port if you run the backend on another one.
 }
 ```
 
-Restart Claude Desktop, then ask something like "What's the verdict on 8.8.8.8?". No API key goes
+Start Claude Desktop again, then ask something like "What's the verdict on 8.8.8.8?". No API key goes
 in this config: only the backend reads the AbuseIPDB key, from `.env`. The server's log lines go to
 stderr, which Claude Desktop saves in its MCP log files.
 
