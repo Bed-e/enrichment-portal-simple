@@ -28,7 +28,10 @@ def get(source, ip):
         return None
     stored_at, result = entry
     if time.time() - stored_at >= TTL_SECONDS[source][result["status"]]:
-        del _entries[(source, ip)]  # expired: forget it, so the source is asked again
+        # Expired: forget it, so the source is asked again. pop(..., None) instead of del:
+        # flask run handles requests in parallel threads, so another request for the same
+        # expired entry may have removed it already, and del would then raise KeyError (a 500).
+        _entries.pop((source, ip), None)
         return None
     # A copy, so a caller changing the dict can't change what is stored.
     return copy.deepcopy(result)

@@ -100,6 +100,21 @@ def test_expired_entry_asks_the_source_again():
     assert internetdb.call_count == 2
 
 
+def test_expired_entry_already_removed_by_another_request_is_not_an_error():
+    # Simulated race (no threads needed): flask run handles requests in parallel, so two
+    # requests can both find the same expired entry. We recreate the moment in between:
+    # while get() checks the clock, "another request" removes the entry first.
+    with at_time(1000):
+        cache.put("internetdb", "8.8.8.8", answer("internetdb"))
+
+    def clock_while_another_request_removes_it():
+        cache._entries.pop(("internetdb", "8.8.8.8"), None)  # the other request got there first
+        return 1000 + 24 * HOUR  # expired
+
+    with patch("cache.time.time", side_effect=clock_while_another_request_removes_it):
+        assert cache.get("internetdb", "8.8.8.8") is None  # no KeyError, just "not cached"
+
+
 def test_not_found_expires_sooner_than_a_real_answer():
     p1, p2, p3 = fake_sources(internetdb="no_data")
     with p1 as internetdb, p2, p3:
