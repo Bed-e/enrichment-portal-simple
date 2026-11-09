@@ -1,6 +1,6 @@
 # IP Enrichment Portal (Simple) — Design
 
-Status: draft v1.0. M1 to M5 are built and merged. This document describes the app as built: a backend and a frontend that talk through the contract in section 7. Sections 2 and 6 still describe the single-program layout as built through M4 where noted; the layout after the split is in M5.
+Status: draft v1.1. M1 to M5 are built and merged. M6 (a graded 0 to 100 certainty in the verdict) is designed here and not built yet. Sections 13 and 14 describe the MCP server and the Skill, which M6 touches only in small ways (M6, step 3). This document describes the app as built: a backend and a frontend that talk through the contract in section 7. Sections 2 and 6 still describe the single-program layout as built through M4 where noted; the layout after the split is in M5.
 Owner: Ben
 
 ---
@@ -42,7 +42,7 @@ A small local web app. An analyst types one IP address, and the app shows two th
 - Single IPv4 lookup
 - Detecting private and reserved addresses, labelling them, explaining them and not sending them to the sources
 - Three sources: Shodan InternetDB, RDAP, AbuseIPDB
-- A verdict from a simple points score
+- A verdict from a simple points score: a certainty of malicious activity from 0 to 100 (graded by what the sources report), plus a level label derived from it (M6)
 - A Flask web page with a form and a results section
 - Automated tests: the pure logic (built), plus the three source functions replaying recorded real responses (M5)
 - (M5) A separate backend and frontend that talk through the written API contract (section 7)
@@ -134,10 +134,12 @@ The old design had separate `timeout` and `rate_limited` statuses. Here they col
 {
     "ip": "8.8.8.8",
     "classification": {"category": "global", "explanation": None, "ip": "8.8.8.8"},
-    "verdict": {"level": "no_known_bad", "score": 0, "summary": "...", "reasons": ["..."]},
+    "verdict": {"level": "malicious", "score": 70, "summary": "...", "reasons": ["..."]},
     "sources": [ <source result>, <source result>, <source result> ],
 }
 ```
+
+`verdict.score` is the **certainty of malicious activity, a whole number from 0 to 100** (section 3.4). It is `None` (JSON `null`) when there is no evidence to judge on: the level is `unknown` or `not_applicable`. `verdict.level` is derived from the score in the backend.
 
 ---
 
@@ -205,40 +207,60 @@ A **pure function**: dicts in, dict out, no network and no Flask. This makes it 
 
 **Early exits (before any scoring):**
 
-1. If the classification is not `global`, the level is `not_applicable` and the summary is "Private or reserved address. External sources were not queried."
-2. If no *flagging* source answered (see below), the level is `unknown`.
+1. If the classification is not `global`, the level is `not_applicable`, the score is `None` and the summary is "Private or reserved address. External sources were not queried."
+2. If no *flagging* source answered (see below), the level is `unknown` and the score is `None`.
+
+The score is `None` (not `0`) in both cases on purpose. A `0` would read as "certainly not malicious", but here we have no evidence at all, and missing evidence must never look like good news (see the wording rules below).
 
 **Flagging sources** are the ones that can actually raise a red flag: **InternetDB and AbuseIPDB**. RDAP only says who owns the address, so it can't say whether the IP is bad. "No red flags" means nothing unless a source that *could* have raised a flag looked and found none. "Answered" means a status of `ok` or `no_data`.
 
-**Scoring** (a running total; each rule that fires adds points and appends a reason string). These are the constants at the top of `verdict.py`:
+**Scoring** (a running total; each rule that fires adds points and appends a reason string). The total is the **certainty of malicious activity, 0 to 100**. These are the constants at the top of `verdict.py`:
 
 | Signal | Points | Reason text |
 |---|---|---|
-| AbuseIPDB `abuse_confidence_score` ≥ 75 | +5 | "AbuseIPDB confidence score is 87/100" |
-| AbuseIPDB `abuse_confidence_score` 25–74 | +2 | same wording |
-| AbuseIPDB `is_tor` true | +1 | "AbuseIPDB flags this as a Tor exit node" |
-| InternetDB tag in {`c2`, `malware`, `compromised`} | +5 | "InternetDB tag: c2" |
-| InternetDB tag in {`tor`, `vpn`, `proxy`} | +1 | "InternetDB tag: vpn" |
-| InternetDB `vulns` not empty | +1 | "3 known CVEs on exposed services" |
+| AbuseIPDB `abuse_confidence_score` (0 to 100) | the score × 0.8, rounded to a whole number (0 to 80) | "AbuseIPDB confidence score is 87/100 (+70)" |
+| AbuseIPDB `is_tor` true | +5 | "AbuseIPDB flags this as a Tor exit node (+5)" |
+| InternetDB tag in {`c2`, `malware`, `compromised`} | +60 per tag | "InternetDB tag: c2 (+60)" |
+| InternetDB tag in {`tor`, `vpn`, `proxy`} | +5 per tag | "InternetDB tag: vpn (+5)" |
+| InternetDB `vulns` not empty | +5, once | "3 known CVEs on exposed services (+5)" |
 
-**Mapping the total to a level:**
+A rule that adds 0 points (for example an AbuseIPDB score of 0) adds no reason line.
 
-| Total | Level |
+**Capping.** After all the rules have run, the total is capped: `score = min(total, 100)`. Two strong signals together (for example a `c2` tag and a high AbuseIPDB score) would otherwise go past 100, and a certainty above 100 makes no sense. The reasons list still shows every rule that fired, so nothing is hidden by the cap.
+
+**Why graded.** The old rule gave AbuseIPDB a flat +5 for any score from 75 to 100, so 76 and 100 looked the same. Now AbuseIPDB contributes in proportion to its own number. The tags are yes-or-no facts with no number to scale, so they stay fixed amounts. "Scale one number, add a few fixed amounts, cap at 100" is the whole formula.
+
+**Mapping the score to a level** (the backend does this, so every caller gets the same label):
+
+| Score | Level |
 |---|---|
-| 5 or more | `malicious` |
-| 2 to 4 | `suspicious` |
-| 0 or 1 | `no_known_bad` |
+| 60 to 100 | `malicious` |
+| 20 to 59 | `suspicious` |
+| 0 to 19 | `no_known_bad` |
 
-(0 or 1 counts as no known bad because a lone Tor/VPN tag or one CVE isn't a bad-IP signal on its own. It does still show up in the reasons list.)
+(0 to 19 counts as no known bad because a lone Tor/VPN tag or one CVE, worth 5 points each, isn't a bad-IP signal on its own. It does still show up in the reasons list.)
+
+These weights and thresholds were chosen so that the levels match the old flat rules at their old boundaries: AbuseIPDB 75 gives 60 (malicious), AbuseIPDB 25 gives 20 (suspicious), a lone `c2` tag gives 60 (malicious) and Tor alone gives 5 (no known bad). Only the number is new.
+
+**Worked examples** (check them by hand):
+
+| Evidence | Points | Score | Level |
+|---|---|---|---|
+| AbuseIPDB 87 | 87 × 0.8 = 69.6, rounds to 70 | 70 | `malicious` |
+| AbuseIPDB 40 and the Tor flag | 32 + 5 | 37 | `suspicious` |
+| InternetDB `vpn` tag and 2 CVEs | 5 + 5 | 10 | `no_known_bad` |
+| InternetDB `c2` tag and AbuseIPDB 90 | 60 + 72 = 132, capped | 100 | `malicious` |
+| Both flagging sources answered, nothing found | 0 | 0 | `no_known_bad` |
 
 **The summary text** is a short headline ("Strong signs of malicious activity.", "Some warning signs." or "No known bad found.") followed by a coverage sentence naming which flagging sources answered and which didn't, for example "Answered: Shodan InternetDB. No answer from: AbuseIPDB (not_configured), so this is weaker evidence."
 
 **Rules about wording (kept from the old design):**
 
 - The app never says "clean" or "safe". `no_known_bad` means the sources found nothing, not that the IP is safe.
-- A source that failed, was missing a key or was skipped never makes a verdict look *better*. It only counts as missing evidence.
+- A source that failed, was missing a key or was skipped never makes a verdict look *better*. It only counts as missing evidence. (It adds no points, and if no flagging source answered at all, the score is `None` rather than `0`.)
+- A score of 0 with level `no_known_bad` means "the sources we asked found nothing", never "this IP is safe".
 
-**The thresholds and weights are placeholders in one visible place.** They are constants at the top of `verdict.py`, so they are easy to find and change.
+**The thresholds and weights are placeholders in one visible place.** They are constants at the top of `verdict.py` (the 0.8 AbuseIPDB weight, the 60 and 5 point values, the cap of 100 and the two level thresholds), so they are easy to find and change.
 
 ### 3.5 `lookup.lookup(ip_text)`
 
@@ -305,7 +327,7 @@ Stretch goals after M5, one at a time, are listed at the end of section 6.
 
 **D6 — Five statuses, with timeouts and rate limits folded into `error`.** The verdict treats all of them the same way (as missing evidence), so splitting them adds no behaviour. The message text says what happened.
 
-**D7 — The verdict is a points score with named constants.** It's about 30 lines of `if` statements. Every verdict lists the reasons that fired, so the result explains itself. The weights are kept in one visible place.
+**D7 — The verdict is a points score with named constants.** It's about 30 lines of `if` statements. Every verdict lists the reasons that fired, so the result explains itself. The weights are kept in one visible place. From M6 the points are graded (AbuseIPDB's own 0 to 100 number is scaled, the tags stay fixed amounts) and the total is a certainty from 0 to 100 (D36).
 
 **D8 — The verdict never says "clean".** `no_known_bad` states honestly that nothing was found. `unknown` is used when no source that could flag the IP gave an answer.
 
@@ -345,6 +367,8 @@ Stretch goals after M5, one at a time, are listed at the end of section 6.
 **D20 — Tests of the sources replay recorded real responses, saved by hand (M5).** I fetch each source once and save the unedited answer as a file in `tests/samples/`. Tests swap `requests.get` for a fake that hands back that file. This tests the real response shape without touching the network or using up quotas. Failures that can't be recorded on demand (timeouts, rate limits, a rejected key) are simulated, and the test says so. See section 10.
 
 **D21 — The port is set on the command line, and no containers are used.** `flask run --port N` makes the port configurable with nothing new to learn. Containers are optional (at most two), and I don't use them. See section 9.
+
+**D36 — `verdict.score` becomes the 0 to 100 certainty, and is `null` when there is no evidence (M6).** Other programs call the backend, so what matters to them is a number they can sort and compare, not a flat value that only means "above or below a line". I reuse the existing `score` field instead of adding a second number, so there is one number to explain and the shape of the contract barely changes. `level` stays in the API, derived from the score in the backend, for two reasons: the thresholds live in one place so every caller gets the same label, and the frontend and template need no change. `score` is `null` for `unknown` and `not_applicable` because a `0` would claim we are sure nothing is wrong, when really we looked at nothing. The cost is that callers must handle `null`, and that is a real change to the contract (section 7). (Numbered D36 because D22 to D35 were added in sections 13 and 14; it stays here because it is a decision about the verdict.)
 
 ---
 
@@ -435,6 +459,16 @@ enrichment-portal-simple/
 
 *Done when:* the source functions are tested against recorded real responses with the network off; and, with both programs running, I get the same results in the browser as at the end of M4. I can call the backend directly with `curl` and get the JSON from the contract. The frontend shows a readable message when the backend is stopped. I can explain what the contract is, which side owns what, and why the key never reaches the frontend.
 
+**M6: Graded certainty.** *Designed here, not built yet.*
+Change the verdict from flat points to a 0 to 100 certainty (section 3.4, D36). No new files, libraries or concepts: one multiplication, `round`, `min`, and `None` for "no evidence". Steps, each on a branch and a pull request:
+
+1. **Update `verdict.py`.** New constants, scaled AbuseIPDB points, the cap, the new level thresholds, `score: None` in both early exits, and reason lines that show the points.
+2. **Update `backend/tests/test_verdict.py`** for the new numbers (section 10).
+3. **Update the other places that mention the old score:** `README.md`, `frontend/tests/samples/backend_ok.json` (a recorded backend answer with the old `score`; I decide with Claude whether to re-record it with `curl` or edit the one number by hand, and I am told before it is touched), and a check of `backend/lookup.py` and `backend/measure_calls.py` for assumptions about `score`. Also the MCP server and the Skill, which need small edits and no rewrite: (a) the `lookup_ip` description in `mcp_server/server.py` says only "score", so it should say "certainty 0 to 100, `null` when there is no evidence" (`_compact` passes `verdict["score"]` straight through, so the code is unchanged and `None` is fine); (b) `mcp_server/tests/samples/backend_private.json` has `"score": 0`, which becomes `null` (re-recorded or edited by hand, as for the frontend sample, and I am told first); (c) `.claude/skills/ioc-triage/SKILL.md` copies `verdict.score` into its Score column, so it gets one added rule: when `score` is `null` (levels `unknown` and `not_applicable`), write `-`.
+4. **Check the frontend.** The template never reads `score`, so it should need no change. I confirm that with the backend running, for a public IP, a private IP and an IP with no answering flagging source.
+
+*Done when:* `pytest` passes in `backend/` and `frontend/` with the network off; `curl http://127.0.0.1:5001/api/ip/8.8.8.8` shows a `score` between 0 and 100; a private address shows `"score": null` and `"level": "not_applicable"`; the page looks and behaves as it did at the end of M5; and I can explain the scoring formula line by line.
+
 ### Stretch goals (only after M5, one at a time)
 
 - Query sources with `ThreadPoolExecutor`, which makes the lookup take as long as the slowest source and fits in about 5 extra lines. (This is optimization, so it is later.)
@@ -487,9 +521,9 @@ The body is the lookup result dict from section 2, as JSON. All keys shown are a
 }
 ```
 
-(The values above are illustrative; real answers differ.)
+(The values above are illustrative; real answers differ. A lookup with evidence would instead show, for example, `"level": "malicious"`, `"score": 70` and `"reasons": ["AbuseIPDB confidence score is 87/100 (+70)"]`.)
 
-**A private or reserved address is also `200`.** Its `classification` carries the category and an explanation, `verdict.level` is `not_applicable`, and all three sources have `status` `skipped` (nothing was sent to them), with `summary`, `raw` and `error` all `null`.
+**A private or reserved address is also `200`.** Its `classification` carries the category and an explanation, `verdict.level` is `not_applicable`, `verdict.score` is `null`, and all three sources have `status` `skipped` (nothing was sent to them), with `summary`, `raw` and `error` all `null`.
 
 ### Field reference
 
@@ -499,8 +533,8 @@ The body is the lookup result dict from section 2, as JSON. All keys shown are a
 | `classification.category` | text | `global`, `private`, `loopback`, `link_local`, `multicast`, `reserved` or `other_non_global` |
 | `classification.ip` | text | the address in standard form (the same value as the top-level `ip`) |
 | `classification.explanation` | text or null | plain-language explanation; `null` when the category is `global` |
-| `verdict.level` | text | `malicious`, `suspicious`, `no_known_bad`, `unknown` or `not_applicable` |
-| `verdict.score` | whole number | the points total from section 3.4 |
+| `verdict.level` | text | `malicious` (score 60 to 100), `suspicious` (20 to 59), `no_known_bad` (0 to 19), `unknown` or `not_applicable` (section 3.4) |
+| `verdict.score` | whole number or null | **the certainty of malicious activity, 0 to 100**, from the points in section 3.4. `null` when `level` is `unknown` or `not_applicable`, because there was no evidence to judge on. A `0` does not mean safe, only that the sources asked found nothing. |
 | `verdict.summary` | text | one or two sentences, safe to show to a user |
 | `verdict.reasons` | list of text | one line per rule that fired; may be empty |
 | `sources[].name` | text | `internetdb`, `rdap` or `abuseipdb` |
@@ -534,6 +568,8 @@ Any other URL gets Flask's default "not found" page. That page is not part of th
 - Error messages are safe to show to a user. Tracebacks and details go to the backend terminal only.
 - The response never contains the API key.
 - Changing this shape means changing the backend, the frontend, this section and anyone else calling the backend, so changes are made here first.
+
+**Contract change in M6:** `verdict.score` used to be a small points total that was always a whole number (for example 5), and was `0` for `unknown`. From M6 it is a 0 to 100 certainty and is `null` for `unknown` and `not_applicable`. The key is the same, its meaning and scale are different, and a caller that assumed a number must now handle `null`. The frontend does not read `score`, so it is unaffected.
 
 ### What the frontend does with each outcome
 
@@ -615,6 +651,15 @@ All tests use `pytest`. **Tests replay recorded real responses and make no netwo
 
 These need no samples and no network, because they only pass dicts to pure functions.
 
+**`test_verdict.py` from M6** (same hand-built dicts; the cases above are kept, with their checks changed from points to the exact score):
+- AbuseIPDB 87 alone gives score `70` and `malicious`; AbuseIPDB 40 and the Tor flag gives `37` and `suspicious`; a `vpn` tag and CVEs gives `10` and `no_known_bad`.
+- Scaling is graded: AbuseIPDB 76 and AbuseIPDB 100 give different scores (61 and 80).
+- A `c2` tag with AbuseIPDB 90 is capped at exactly `100`.
+- Level boundaries: scores 19 and 20, and 59 and 60, land on the right sides (AbuseIPDB 24 gives 19 and `no_known_bad`; 25 gives 20 and `suspicious`; 74 gives 59 and `suspicious`; 75 gives 60 and `malicious`).
+- A private address gives `not_applicable` and a score of `None`; every source `error` gives `unknown` and a score of `None` (not `0`).
+- Both flagging sources answering with nothing found gives score `0` and `no_known_bad`.
+- A reason line is present for each rule that fired, shows its points, and no reason line appears for a rule worth 0 points.
+
 ### Added in M5
 
 **Recorded real responses (samples).**
@@ -675,6 +720,7 @@ def test_internetdb_ok():
 - Never upload or report anything to AbuseIPDB or any other provider. Look-ups only.
 - Never log, print or return the API key.
 - Keep the "Not in this version" list (section 4) out of the code: no database or optimization (the cache in section 12 is the one exception), and do not extend the private-address block that already exists.
+- M6 (the graded certainty) is designed in sections 3.4 and 7 and D36 but not yet built. Build it as its own branch and pull request, and keep the scoring to the formula in section 3.4: no classes, no new libraries. The weights and thresholds are placeholders, kept as constants at the top of `verdict.py`.
 - If a requirement here is ambiguous or conflicts with what you find, ask rather than guess.
 
 ---
