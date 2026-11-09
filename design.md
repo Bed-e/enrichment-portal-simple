@@ -330,6 +330,7 @@ Stretch goals after M5, one at a time, are listed at the end of section 6.
 - `pytest` (development only): runs the tests.
 - Added in M5, tests only: `json` (standard library) to read the recorded sample files, and `unittest.mock` (standard library) to swap `requests.get` for a fake during a test.
 - Added with the cache (section 12), both standard library: `time` (when an answer was stored) and `copy` (store and hand out copies, so nobody changes a stored answer by accident).
+- Added with the MCP server (section 13), MCP server only: `mcp[cli]` version 2 (the official MCP Python SDK), plus `logging` and `sys` (standard library) to log to stderr. `anyio` (installed with `mcp`) runs the SDK's async client in its tests.
 
 **D15 — Educational and non-commercial.** InternetDB's free tier is for non-commercial use, and AbuseIPDB's terms should be checked at sign-up.
 
@@ -599,6 +600,7 @@ Rules:
 |---|---|---|
 | `ABUSEIPDB_API_KEY` | backend only | free AbuseIPDB key; optional (without it, AbuseIPDB shows `not_configured`) |
 | `BACKEND_URL` | frontend only (M5) | where the backend lives; default `http://127.0.0.1:5001` |
+| `PORTAL_URL` | MCP server only (section 13) | where the backend lives; default `http://127.0.0.1:5001`. Set in the Claude Desktop config, **not** in `.env`: the MCP server never reads `.env` |
 
 ---
 
@@ -714,3 +716,55 @@ So the analyst always knows the worst case, the page shows one fixed note under 
 **Tests.** `backend/tests/test_cache.py` covers a miss, a hit (with exactly the contract's fields), different spellings, two different addresses, an expired entry, "not found" expiring sooner, an error, a timeout and a missing key not being cached, and the key holding no API key. `backend/tests/conftest.py` empties the cache before every test, so tests can't see each other's answers. All run with the network off.
 
 **Measuring.** `backend/measure_calls.py` runs a fixed list of 26 lookups (repeats, the same address with extra spaces, private addresses, and one address whose InternetDB request always times out) with the network replaced by the recorded samples, and counts requests per source. Run it from `backend/` with `python measure_calls.py`.
+
+---
+
+## 13. MCP server
+
+Our SOC wants to ask Claude about an indicator instead of opening the portal. `mcp_server/server.py` is a small MCP server (MCP, the Model Context Protocol, is the standard way Claude Desktop calls tools). Claude Desktop starts it on the same computer and sends it tool calls; each call becomes one request to the backend's `GET /api/ip/<ip>`.
+
+```
+Claude Desktop --stdio--> mcp_server/server.py --HTTP GET /api/ip/<ip>--> backend --> sources
+```
+
+**The API contract (section 7) does not change.** The MCP server is one more caller of the backend, like the frontend. Nothing in `backend/`, `frontend/` or section 7 was changed for it.
+
+**Decisions, each with its reason:**
+
+**D22 — One tool, `lookup_ip`.** The portal accepts IPv4 addresses only (section 1; domains, hashes and IPv6 are out of scope in section 4), and there is no endpoint for anything else. A `lookup_domain` or `lookup_hash` tool would have nothing to call. The name is verb + IOC type, and the one argument is called `ip` so it says what it holds.
+
+**D23 — The description tells the model everything it needs to use the answer.** A model only knows a tool by its description (the function's docstring) and its input schema (from the type hint `ip: str`). So the description says: what goes in (one IPv4 address), what comes out (category, verdict level, score, summary, reasons, and each source's status, key fields and error), which sources answer (InternetDB, RDAP, AbuseIPDB, and that RDAP never changes the verdict), what `no_data` means (answered, knows nothing; not proof of safety), that answers may be reused up to the cache times in section 12, and what is refused (IPv6, ranges, hostnames, domains, URLs, hashes, lists) with "do not retry" so the model doesn't try again in a different form.
+
+**D24 — The server checks the input itself, before calling the portal.** It uses `ipaddress.ip_address()`, the same standard-library parser as `ip_tools.py`, after stripping spaces, and rejects IPv6. Checking first gives the model a specific reason ("That is not a valid IPv4 address...") and avoids a pointless request. It also stops text with a `/` in it (a CIDR range or a URL) from changing which backend URL is called. Private and reserved addresses are **not** refused: the portal answers them with `not_applicable`, which is useful to the analyst. The address is sent in its standard form and URL-quoted, as the frontend does.
+
+**D25 — Errors become tool errors; a failing source does not.** Raising `ToolError` makes the SDK return a normal result with `isError: true` and our message, so the model can read it and nothing crashes. The messages are fixed text, kept short and plain on purpose. Following section 7's rule, a failing source stays inside a successful result.
+
+| Input or portal answer | What the tool returns |
+|---|---|
+| Valid IPv4, `200` | The compact result (below) |
+| `200` with a source `error`, `no_data` or `not_configured` | The compact result; that source's status and error are kept |
+| Private or reserved IPv4, `200` | The compact result with level `not_applicable` and sources `skipped` |
+| Not an IP address (text, empty, a range, a domain, a URL, a hash, a list) | Tool error: "That is not a valid IPv4 address. Give one address like 8.8.8.8; ranges, hostnames, domains, URLs and hashes are not supported." No request is made. |
+| IPv6 | Tool error: "IPv6 is not supported by the portal; only IPv4 addresses can be looked up." No request is made. |
+| `400` from the portal | Tool error with the portal's own `message` (safe to show, section 7) |
+| `500` from the portal | Tool error: "The portal had an internal error. Details are in the portal's terminal." |
+| No connection or a timeout (30 seconds, like the frontend) | Tool error: "Could not reach the portal at <PORTAL_URL>. Is the backend running?" |
+| Any other status, or an answer that isn't the contract's JSON | Tool error: "The portal gave an unexpected answer." |
+
+Details (the status code, the exception) go to the log, never into the tool's answer.
+
+**D26 — A compact result.** The tool returns only `ip`, `category`, `explanation`, `verdict` (`level`, `score`, `summary`, `reasons`) and, per source, `name`, `status`, `summary` and `error`. The `raw` JSON is left out because it is large, the model doesn't need it, and the description doesn't promise it. `display_name` is left out because `name` already says which source it is.
+
+**D27 — The portal's address comes from `PORTAL_URL`.** It is an environment variable set in the Claude Desktop config, read on every call with `os.environ.get`, with the default `http://127.0.0.1:5001` (the backend's default). Another portal on the same laptop on another port (section 9) only needs a different `PORTAL_URL`. The MCP server does **not** load `.env` and never sees `ABUSEIPDB_API_KEY`: only the backend reads keys, so there is no key in the server, its config or the Claude Desktop config.
+
+**D28 — stdio, and logging to stderr only.** Claude Desktop starts the server and talks to it over stdin and stdout, so stdout must carry nothing but the protocol. The server has no `print()`; it logs with `logging` to stderr (one line per lookup: address and HTTP status). Claude Desktop keeps stderr in its MCP log file.
+
+**D29 — The tool is marked read-only.** `ToolAnnotations(read_only_hint=True)` tells the client the tool changes nothing, which is true: the backend only reads from the sources (section 4).
+
+**D30 — pip, the existing venv and the root `requirements.txt`.** This follows D13 and D19. The exercise's examples use `uv`, but the project's tool is pip. `mcp[cli]` is pinned to `>=2,<3`, because version 1 has a different API (`FastMCP` instead of `MCPServer`). Checked with version 2.3.0 on Python 3.14.
+
+**D31 — Tests talk to the server through the SDK's own client.** `mcp_server/tests/test_server.py` lists the tools and calls `lookup_ip` exactly as Claude Desktop would, so it checks what a model really sees. `requests.get` is patched to replay recorded backend answers from `mcp_server/tests/samples/` (an 8.8.8.8 answer copied from the frontend's samples, a private address, and the two `400` bodies, recorded with no source calls). The tests cover the tool list (name, input, read-only hint, description), a public and a private address, a failing source, `PORTAL_URL`, every invalid input type (each a tool error with no request made), and the portal's `400`, `500`, being down and answering something unexpected. One test starts `server.py` as a real program over stdio, which fails if anything else is printed to stdout. No test uses the network.
+
+**D32 — An exception to section 11, approved through the pull request.** Section 11 asks for new libraries, decorators other than `@app.route`, and type-heavy code to be run past Ben first. The server needs the `mcp` library, its `@mcp.tool()` decorator and type hints (the SDK builds the input schema from them). They stay inside `mcp_server/`, and the pull request that adds them is where Ben approves or rejects them.
+
+**Running and connecting it** is in the README ("MCP server").
