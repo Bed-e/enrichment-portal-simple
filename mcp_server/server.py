@@ -77,14 +77,16 @@ def lookup_ip(ip: str) -> dict:
     In: ip, a single IPv4 address such as "8.8.8.8".
 
     Out: the address, its category (global, private, loopback, link_local, multicast, reserved,
-    other_non_global), the verdict (level: malicious, suspicious, no_known_bad, unknown or
+    other_non_global), the verdict (level: malicious, suspicious, no_known_bad or
     not_applicable; score; summary; reasons) and, for each source, its status, key fields
-    (summary) and any error message. The score is the certainty of malicious activity from 0 to
-    100, or null when there is no evidence (level unknown or not_applicable). A score of 0 does
-    not mean safe, only that the sources asked found nothing.
+    (summary) and any error message. The score is always a whole number from 0 to 100: out of
+    100 IPs that came back with this same evidence, about how many are malicious. Missing
+    information raises it, so an IP that is unregistered or unknown to the sources scores in the
+    suspicious range. A low score does not mean safe. For not_applicable (private) it is 0 and
+    means "not judged".
 
-    Sources: Shodan InternetDB (open ports, tags, CVEs), RDAP (who owns the address; never
-    changes the verdict) and AbuseIPDB (abuse reports).
+    Sources: Shodan InternetDB (open ports, tags, CVEs), RDAP (who owns the address; having no
+    registration record raises the score) and AbuseIPDB (abuse reports).
 
     Source status: "no_data" means the source answered but knows nothing about this IP, which is
     not proof it is safe. "error" or "not_configured" means that source gave no evidence.
@@ -132,6 +134,13 @@ def lookup_ip(ip: str) -> dict:
 
     if response.status_code == 500:
         raise ToolError("The portal had an internal error. Details are in the portal's terminal.")
+
+    if response.status_code == 503:
+        # Every source the portal tried failed. This is not a verdict: the IP was not judged.
+        raise ToolError(
+            "No data source could be reached by the portal, so this address was not judged. "
+            "Try again shortly."
+        )
 
     if response.status_code != 200:
         log.warning("lookup %s: unexpected HTTP %s", address, response.status_code)

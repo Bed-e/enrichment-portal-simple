@@ -37,10 +37,11 @@ Use only the `lookup_ip` tool of the `ioc-portal` MCP server. In Claude Code it 
 
 | Tool answer | Verdict cell | Score | Key evidence | Source problems |
 |---|---|---|---|---|
-| A normal result | `verdict.level` as returned | `verdict.score`, or `-` when it is `null` (levels `unknown` and `not_applicable`) | `verdict.reasons` joined with `; `, or `none` if empty | see below |
-| A normal result with level `not_applicable` | `not_applicable` | `-` (the score is `null`) | `<category> address` (e.g. `private address`) | `all skipped (not sent out)` |
+| A normal result | `verdict.level` as returned | `verdict.score` as returned (always a number from 0 to 100) | `verdict.reasons` joined with `; `, or `none` if empty | see below |
+| A normal result with level `not_applicable` | `not_applicable` | `-` (the score is 0 but means "not judged", so do not show it) | `<category> address` (e.g. `private address`) | `all skipped (not sent out)` |
 | Tool error "That is not a valid IPv4 address..." or "IPv6 is not supported..." or any other portal message about the input | `refused` | `-` | `-` | `-` |
 | Tool error "Could not reach the portal at ..." | `not_checked` | `-` | `-` | `portal unreachable` |
+| Tool error "No data source could be reached by the portal..." | `not_checked` | `-` | `no sources reachable` |
 | Any other tool error (internal error, unexpected answer) | `not_checked` | `-` | `-` | the tool's error message |
 
 **Source problems** for a normal result: list every source whose `status` is not `ok`, joined
@@ -72,7 +73,6 @@ calling the tool. That value and every later value get `not_checked` and `portal
 | malicious | <n> |
 | suspicious | <n> |
 | no_known_bad | <n> |
-| unknown | <n> |
 | not_applicable | <n> |
 | refused | <n> |
 | not_checked | <n> |
@@ -91,7 +91,7 @@ lookup_ip called <N> times. No other tools or sources used.
 
 Rules for the format:
 
-- Show all seven verdict rows in Counts, even when the count is 0. The counts add up to Total.
+- Show all six verdict rows in Counts, even when the count is 0. The counts add up to Total.
 - If nothing was refused, write `None.` under Refused values.
 - If the portal was unreachable, add this line directly under the Results table:
   `Portal unreachable: start the backend (cd backend, then flask --app api run --port 5001) and run the triage again.`

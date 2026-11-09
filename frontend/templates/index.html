@@ -25,7 +25,16 @@
 
     {# The banner colour comes from the verdict level via a CSS class (verdict-malicious, etc.). #}
     <section class="verdict verdict-{{ result.verdict.level }}">
-      <h2>{{ result.verdict.level | replace("_", " ") | title }}</h2>
+      {# The level and the big score sit side by side. The score is hidden for not_applicable:
+         it is 0 there, but that means "not judged", and a large 0 would read as "safe". #}
+      <div class="verdict-header">
+        <h2>{{ result.verdict.level | replace("_", " ") | title }}</h2>
+        {% if result.verdict.level != "not_applicable" and result.verdict.score is not none %}
+          <p class="verdict-score" title="Out of 100 IPs with this evidence, about this many are malicious">
+            {{ result.verdict.score }}<span class="verdict-score-max">/100</span>
+          </p>
+        {% endif %}
+      </div>
       <p>{{ result.verdict.summary }}</p>
       {% if result.verdict.reasons %}
         <ul>

@@ -62,7 +62,8 @@ def query_internetdb(ip):
 def query_rdap(ip):
     """RDAP: who registered this address block (owner, country, dates). No API key needed.
 
-    RDAP says who OWNS an address, not whether it is bad, so it never affects the verdict.
+    RDAP says who OWNS an address, not whether it is bad. It only raises the score when it
+    has nothing (no registration record), because undocumented IPs are riskier (verdict.py).
     """
     result = {
         "name": "rdap",

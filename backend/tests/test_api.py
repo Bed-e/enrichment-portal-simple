@@ -6,6 +6,7 @@ listens on a port. lookup is patched in api.py's namespace, so no source is cont
 from unittest.mock import patch
 
 from api import app
+from lookup import SourcesUnavailableError
 
 # Created once: test_client() gives us an object that can .get() a URL like a browser would.
 client = app.test_client()
@@ -51,3 +52,15 @@ def test_unexpected_error_returns_500_without_details():
     assert response.get_json() == {"error": "internal_error", "message": "Something went wrong."}
     assert "secret internal detail" not in response.get_data(as_text=True)
     assert "Traceback" not in response.get_data(as_text=True)
+
+
+def test_all_sources_down_returns_503_without_details():
+    # Simulated: lookup() raises the error it raises when every queried source failed.
+    with patch("api.lookup", side_effect=SourcesUnavailableError()):
+        response = client.get("/api/ip/8.8.8.8")
+
+    assert response.status_code == 503
+    assert response.get_json() == {
+        "error": "sources_unavailable",
+        "message": "No data source could be reached. Try again shortly.",
+    }
