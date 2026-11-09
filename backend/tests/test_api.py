@@ -64,3 +64,24 @@ def test_all_sources_down_returns_503_without_details():
         "error": "sources_unavailable",
         "message": "No data source could be reached. Try again shortly.",
     }
+
+
+def test_ip_with_slash_returns_json_400_not_html_404():
+    # An analyst pasting a range like 8.8.8.8/24 used to get Flask's HTML 404 page.
+    for path in ("/api/ip/8.8.8.8/24", "/api/ip/8.8.8.8%2F24"):
+        response = client.get(path)
+
+        assert response.status_code == 400
+        assert response.mimetype == "application/json"
+        assert response.get_json()["error"] == "invalid_ip"
+
+
+def test_empty_ip_returns_json_400_not_html_404():
+    response = client.get("/api/ip/")
+
+    assert response.status_code == 400
+    assert response.mimetype == "application/json"
+    assert response.get_json() == {
+        "error": "invalid_ip",
+        "message": "That is not a valid IP address.",
+    }

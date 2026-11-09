@@ -582,12 +582,12 @@ The body is the lookup result dict from section 2, as JSON. All keys shown are a
 | 503 | Every source we queried returned `error` (timeouts, rate limits, a rejected key, a network failure). `not_configured` and `skipped` sources do not count as failures | `{"error": "sources_unavailable", "message": "No data source could be reached. Try again shortly."}` |
 | 500 | Anything unexpected | `{"error": "internal_error", "message": "Something went wrong."}` |
 
-Any other URL gets Flask's default "not found" page. That page is not part of the contract.
+Invalid IP text always gets the `400 invalid_ip` answer, including text that contains `/` (such as `8.8.8.8/24`, also when sent as `%2F`) and empty text (`/api/ip/`). Any URL outside `/api/ip/` gets Flask's default "not found" page. That page is not part of the contract.
 
 ### Rules
 
 - A source failing is **not** an API error. The response is still `200`, with that source's `status` set to `error`, `no_data` and so on.
-- Error messages are safe to show to a user. Tracebacks and details go to the backend terminal only.
+- Error messages are safe to show to a user. Tracebacks and details go to the backend terminal only. When a source request fails, the backend prints one line with the URL and the error to its terminal; header values (the AbuseIPDB key) are replaced with `[hidden]`.
 - The response never contains the API key.
 - Changing this shape means changing the backend, the frontend, this section and anyone else calling the backend, so changes are made here first.
 

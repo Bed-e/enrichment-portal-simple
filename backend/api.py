@@ -16,9 +16,14 @@ app = Flask(__name__)
 IPV6_MESSAGE = "IPv6 is not supported yet."
 
 
-# <ip> in the route is a placeholder: Flask passes whatever text is in that part of the URL
-# to the function as the argument `ip`.
-@app.route("/api/ip/<ip>")
+# <path:ip> is a placeholder: Flask passes whatever text is in that part of the URL to the
+# function as the argument `ip`. The plain <ip> form refuses text containing "/" (such as
+# "8.8.8.8/24"), so Flask would answer with an HTML 404 and our validation would never run.
+# The "path" converter accepts "/", so bad text reaches lookup() and gets the JSON 400.
+@app.route("/api/ip/<path:ip>")
+# A placeholder also cannot be empty, so "/api/ip/" gets its own route that passes ip="".
+# classify_ip("") then rejects it like any other invalid text.
+@app.route("/api/ip/", defaults={"ip": ""})
 def api_ip(ip):
     try:
         result = lookup(ip)

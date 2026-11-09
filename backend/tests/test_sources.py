@@ -162,3 +162,31 @@ def test_abuseipdb_no_key_means_not_configured_and_no_request():
         result = query_abuseipdb("8.8.8.8")
     assert result["status"] == "not_configured"
     mock_get.assert_not_called()  # no key means we must not even try the request
+
+
+# --- Failure details go to the terminal, and never include the API key ---
+
+def test_failed_request_prints_url_and_error_type_but_returns_the_same_short_message(capsys):
+    with patch("sources.requests.get", side_effect=requests.ConnectionError("connection refused")):
+        result = query_internetdb("8.8.8.8")
+
+    # The page/JSON message is unchanged: only the error type name.
+    assert result["error"] == "Network error: ConnectionError"
+    printed = capsys.readouterr().out
+    assert "https://internetdb.shodan.io/8.8.8.8" in printed
+    assert "ConnectionError" in printed
+    assert "connection refused" in printed
+
+
+def test_printed_failure_never_contains_the_api_key(capsys, monkeypatch):
+    fake_key = "test-key-123"  # fake value, never a real key
+    monkeypatch.setenv("ABUSEIPDB_API_KEY", fake_key)
+    # Simulate an error whose own message includes the header value.
+    error = requests.RequestException(f"Invalid header value: {fake_key}")
+    with patch("sources.requests.get", side_effect=error):
+        result = query_abuseipdb("8.8.8.8")
+
+    assert result["error"] == "Network error: RequestException"
+    printed = capsys.readouterr().out
+    assert fake_key not in printed
+    assert "[hidden]" in printed
