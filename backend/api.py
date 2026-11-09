@@ -3,7 +3,7 @@ import traceback
 from dotenv import load_dotenv
 from flask import Flask, jsonify
 
-from lookup import lookup
+from lookup import SourcesUnavailableError, lookup
 
 # Read the .env file (if there is one) into environment variables, so
 # sources.py can find ABUSEIPDB_API_KEY. Only the backend reads the key.
@@ -29,6 +29,15 @@ def api_ip(ip):
         # jsonify turns a dict into a JSON response. The number after the comma is the
         # HTTP status code (400 = "the request was wrong"); without it the default is 200.
         return jsonify({"error": code, "message": message}), 400
+    except SourcesUnavailableError:
+        # Every source we tried failed. 503 means "Service Unavailable: try again later".
+        # The response carries only a fixed, safe message. The terminal gets a short note
+        # (details stay out of the response, as with every error here).
+        print(f"No source could be reached for {ip}", flush=True)
+        return jsonify({
+            "error": "sources_unavailable",
+            "message": "No data source could be reached. Try again shortly.",
+        }), 503
     except Exception:
         # Anything unexpected: details go to this terminal, never to the caller.
         traceback.print_exc()

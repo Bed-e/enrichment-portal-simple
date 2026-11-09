@@ -121,6 +121,7 @@ def test_private_ip_is_not_applicable_with_sources_skipped():
     assert data["category"] == "private"
     assert data["explanation"]
     assert data["verdict"]["level"] == "not_applicable"
+    assert data["verdict"]["score"] == 0  # a number, never null; the level says "not judged"
     assert {s["status"] for s in data["sources"]} == {"skipped"}
 
 
@@ -187,6 +188,14 @@ def test_portal_500_is_a_tool_error():
     with patch("server.requests.get", return_value=FakeResponse(500, body)):
         message = error_text(call({"ip": "8.8.8.8"}))
     assert "internal error" in message
+
+
+def test_portal_503_is_a_tool_error_saying_the_ip_was_not_judged():
+    # Simulated, using the contract's 503 body (design.md section 7): every source failed.
+    body = {"error": "sources_unavailable", "message": "No data source could be reached. Try again shortly."}
+    with patch("server.requests.get", return_value=FakeResponse(503, body)):
+        message = error_text(call({"ip": "8.8.8.8"}))
+    assert "not judged" in message
 
 
 def test_portal_down_is_a_tool_error_naming_the_address():

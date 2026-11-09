@@ -69,6 +69,13 @@ def test_500_shows_unavailable_message():
     assert UNAVAILABLE in response.get_data(as_text=True)
 
 
+def test_503_shows_unavailable_message():
+    # Simulated: the backend is up but every source it tried failed.
+    response, _ = post_lookup("8.8.8.8", FakeResponse(503, {"error": "sources_unavailable"}))
+
+    assert UNAVAILABLE in response.get_data(as_text=True)
+
+
 def test_connection_error_shows_unavailable_message():
     # Simulated: the backend is stopped.
     response, _ = post_lookup("8.8.8.8", requests.exceptions.ConnectionError("refused"))
@@ -88,3 +95,28 @@ def test_answer_that_is_not_json_shows_unavailable_message():
     response, _ = post_lookup("8.8.8.8", FakeResponse(200, None))
 
     assert UNAVAILABLE in response.get_data(as_text=True)
+
+
+def sample_with_verdict(level, score):
+    """The recorded backend answer with its verdict level and score swapped (hand-edited copy)."""
+    with open(os.path.join(SAMPLES_DIR, "backend_ok.json"), encoding="utf-8") as f:
+        sample = json.load(f)
+    sample["verdict"]["level"] = level
+    sample["verdict"]["score"] = score
+    return sample
+
+
+def test_score_is_shown_large_next_to_the_level():
+    response, _ = post_lookup("8.8.8.8", FakeResponse(200, sample_with_verdict("suspicious", 52)))
+    page = response.get_data(as_text=True)
+
+    assert 'class="verdict-score"' in page
+    assert "52" in page.split('class="verdict-score"')[1].split("</p>")[0]
+    assert "/100" in page
+
+
+def test_score_is_hidden_for_not_applicable():
+    # The backend sends score 0 for a private address, meaning "not judged". Showing a big 0 would mislead.
+    response, _ = post_lookup("10.0.0.5", FakeResponse(200, sample_with_verdict("not_applicable", 0)))
+
+    assert 'class="verdict-score"' not in response.get_data(as_text=True)

@@ -7,10 +7,11 @@ time.time as seen by cache.py, so "6 hours later" takes no real time.
 import os
 from unittest.mock import patch
 
+import pytest
 import requests
 
 import cache
-from lookup import lookup
+from lookup import SourcesUnavailableError, lookup
 
 HOUR = 60 * 60
 FAKE_KEY = "fake-test-key-not-real"  # never a real key
@@ -149,8 +150,11 @@ def test_timeout_from_the_network_is_not_cached():
     # Simulated: the real source functions run, but every request times out.
     with patch.dict(os.environ, {}, clear=True), \
             patch("sources.requests.get", side_effect=requests.exceptions.Timeout()) as get:
-        lookup("8.8.8.8")
-        lookup("8.8.8.8")
+        # M7: every queried source failed, so lookup() raises instead of returning a score.
+        # What matters here is that nothing was cached, so the second call asks again.
+        for _ in range(2):
+            with pytest.raises(SourcesUnavailableError):
+                lookup("8.8.8.8")
 
     # InternetDB + RDAP, twice each (no key, so AbuseIPDB never sends a request).
     assert get.call_count == 4

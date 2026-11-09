@@ -2,8 +2,8 @@
 
 A small local web app. Type one IPv4 address and it shows:
 
-- a **verdict** (Malicious, Suspicious, No known bad, Unknown, or Not applicable for private
-  addresses) with the reasons listed
+- a **verdict** (Malicious, Suspicious, No known bad, or Not applicable for private
+  addresses) with a 0 to 100 score and the reasons listed
 - one **card per source**, with the raw response available on demand
 
 Sources: Shodan InternetDB, RDAP (registration data) and AbuseIPDB.

@@ -4,6 +4,24 @@ from sources import query_abuseipdb, query_internetdb, query_rdap
 from verdict import score_verdict
 
 
+class SourcesUnavailableError(Exception):
+    """Every source we tried failed, so there is nothing honest to score.
+
+    A small custom error type lets api.py tell this case apart from bad input (ValueError)
+    and from unexpected bugs (any other Exception).
+    """
+
+
+def _all_queried_sources_failed(sources):
+    """True when we asked at least one source and every one of them returned "error".
+
+    not_configured (no API key) and skipped (private IP) mean we never tried that source,
+    so they are not failures. Private addresses have only skipped sources, so they never match.
+    """
+    tried = [s for s in sources if s["status"] not in ("not_configured", "skipped")]
+    return bool(tried) and all(s["status"] == "error" for s in tried)
+
+
 def _skipped(name, display_name):
     """A source result for a source we deliberately did not query."""
     return {
@@ -51,6 +69,11 @@ def lookup(ip_text):
             _from_cache_or_query("rdap", ip, query_rdap),
             _from_cache_or_query("abuseipdb", ip, query_abuseipdb),
         ]
+
+    # If nothing we tried answered, the cause is probably the network or the providers, not
+    # the IP. Any score would be made up, so we raise instead (api.py answers 503).
+    if _all_queried_sources_failed(sources):
+        raise SourcesUnavailableError()
 
     verdict = score_verdict(classification, sources)
 
