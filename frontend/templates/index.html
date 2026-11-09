@@ -40,10 +40,6 @@
     {% for source in result.sources %}
       <section class="card">
         <h3>{{ source.display_name }} <span class="status status-{{ source.status }}">{{ source.status }}</span></h3>
-        {# Tells the analyst this answer was reused, and how old it is (design.md section 12). #}
-        {% if source.cached %}
-          <p><em>Cached answer, fetched {{ source.fetched_at }} (UTC).</em></p>
-        {% endif %}
 
         {% if source.status == "ok" %}
           <dl>
@@ -79,6 +75,10 @@
         {% endif %}
       </section>
     {% endfor %}
+
+    {# Fixed text, not data from the backend: the API answer is unchanged (design.md section 12). #}
+    <p><em>Answers may be reused for a while to save quota: up to 24 hours for Shodan InternetDB,
+      7 days for RDAP and 6 hours for AbuseIPDB (1 hour if it found no reports).</em></p>
   {% endif %}
 </body>
 </html>

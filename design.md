@@ -265,7 +265,7 @@ Two routes:
 
 `ValueError` (invalid IP or IPv6) becomes an inline error message on the page. Any other unexpected exception gets caught once in `POST /lookup`, shows a generic "Something went wrong." message and prints the traceback to the terminal. The page never shows a stack trace.
 
-**Template (`index.html`):** one file. A form at the top, then if `result` exists: a coloured verdict banner (class depends on `verdict.level`), the classification label and explanation for non-global addresses, the reasons list, then a loop over `result.sources` that makes a card for each. A card shows the display name, status, the summary as a simple key/value list, and the raw JSON inside an HTML `<details>` element, so it collapses with no JavaScript. Jinja features used: `{{ }}`, `{% if %}`, `{% for %}`. Nothing else.
+**Template (`index.html`):** one file. A form at the top, then if `result` exists: a coloured verdict banner (class depends on `verdict.level`), the classification label and explanation for non-global addresses, the reasons list, then a loop over `result.sources` that makes a card for each. A card shows the display name, status, the summary as a simple key/value list, and the raw JSON inside an HTML `<details>` element, so it collapses with no JavaScript. Under the cards, a fixed note says how long answers may be reused (section 12). Jinja features used: `{{ }}`, `{% if %}`, `{% for %}`. Nothing else.
 
 ---
 
@@ -329,7 +329,7 @@ Stretch goals after M5, one at a time, are listed at the end of section 6.
 - `python-dotenv`: loads `.env` into the environment so the key isn't in the code.
 - `pytest` (development only): runs the tests.
 - Added in M5, tests only: `json` (standard library) to read the recorded sample files, and `unittest.mock` (standard library) to swap `requests.get` for a fake during a test.
-- Added with the cache (section 12), all standard library: `time` (when an answer was stored), `copy` (store and hand out copies, so nobody changes a stored answer by accident) and `datetime` (the `fetched_at` time shown to users).
+- Added with the cache (section 12), both standard library: `time` (when an answer was stored) and `copy` (store and hand out copies, so nobody changes a stored answer by accident).
 
 **D15 — Educational and non-commercial.** InternetDB's free tier is for non-commercial use, and AbuseIPDB's terms should be checked at sign-up.
 
@@ -508,10 +508,6 @@ The body is the lookup result dict from section 2, as JSON. All keys shown are a
 | `sources[].summary` | object or null | the picked-out fields below; `null` unless `status` is `ok` |
 | `sources[].raw` | object or null | the source's own JSON with its own field names. For `internetdb` and `rdap` it is set only when `status` is `ok`. For `abuseipdb` it is the response's inner `data` object and is also set when `status` is `no_data`. Otherwise `null` |
 | `sources[].error` | text or null | short message when `status` is `error`; `null` otherwise; never contains the API key |
-| `sources[].cached` | true or false | *Added with the cache (section 12).* `true` when this answer was reused from the cache instead of asking the source now |
-| `sources[].fetched_at` | text or null | *Added with the cache.* When the source was really asked, in UTC, like `2026-11-06T22:48:15Z`. On a cached answer it is the time of the original request. `null` when the source was never asked (`skipped` or `not_configured`) |
-
-The two cache fields are additions only: every field above them, and every status code, is unchanged. The example above predates them; real answers include both on every source.
 
 **`summary` keys per source** (any value may be `null` when the source doesn't give it):
 
@@ -706,8 +702,15 @@ Analysts look up the same addresses again and again, and every lookup spends quo
 
 **Never cached:** `error` (a timeout, a network failure, a `429`, a `5xx`, a rejected key, a bad response) and `not_configured` (no key). The next lookup asks again. `skipped` (private addresses) never reaches a source or the cache.
 
-**Telling a cached answer from a fresh one.** A cached "nothing found" can be wrong tomorrow, so the user is always told. Every source in the API answer has `cached` (true or false) and `fetched_at` (when the source was really asked, UTC); see section 7. On the page, a cached card shows "Cached answer, fetched <time> (UTC)." The expiries above keep that age short, but they can't make it zero, so the age is shown instead of hidden.
+**Telling a cached answer from a fresh one: the expiry makes a per-answer flag unnecessary.** The API contract (section 7) does not change, so answers carry no "cached" field. Instead, the expiries keep every reused answer within an age an analyst can accept:
+- The "is it bad?" evidence is the freshest. AbuseIPDB's "0 reports" (the cached "clean" answer that could be wrong tomorrow) is at most 1 hour old, and an answer with reports at most 6 hours.
+- InternetDB answers are at most 24 hours old, but InternetDB's own data is only updated once a week, so a fresh request would usually return the same thing.
+- RDAP answers can be up to 7 days old, but RDAP only says who owns the address and never changes the verdict (section 3.4).
+- Anything that went wrong is never reused, so a fresh request always follows an error.
+- An analyst who needs a guaranteed-fresh answer can restart the backend, which empties the cache.
 
-**Tests.** `backend/tests/test_cache.py` covers a miss, a hit, different spellings, two different addresses, an expired entry, "not found" expiring sooner, an error, a timeout and a missing key not being cached, and the key holding no API key. `backend/tests/conftest.py` empties the cache before every test, so tests can't see each other's answers. All run with the network off.
+So the analyst always knows the worst case, the page shows one fixed note under the results (plain text in `index.html`, not data from the backend): "Answers may be reused for a while to save quota: up to 24 hours for Shodan InternetDB, 7 days for RDAP and 6 hours for AbuseIPDB (1 hour if it found no reports)." If these expiries change, that note changes with them.
+
+**Tests.** `backend/tests/test_cache.py` covers a miss, a hit (with exactly the contract's fields), different spellings, two different addresses, an expired entry, "not found" expiring sooner, an error, a timeout and a missing key not being cached, and the key holding no API key. `backend/tests/conftest.py` empties the cache before every test, so tests can't see each other's answers. All run with the network off.
 
 **Measuring.** `backend/measure_calls.py` runs a fixed list of 26 lookups (repeats, the same address with extra spaces, private addresses, and one address whose InternetDB request always times out) with the network replaced by the recorded samples, and counts requests per source. Run it from `backend/` with `python measure_calls.py`.

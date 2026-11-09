@@ -51,10 +51,21 @@ def test_miss_then_hit():
     assert internetdb.call_count == 1
     assert rdap.call_count == 1
     assert abuseipdb.call_count == 1
-    assert [s["cached"] for s in first["sources"]] == [False, False, False]
-    assert [s["cached"] for s in second["sources"]] == [True, True, True]
-    # The cached answer keeps the time the source was really asked.
-    assert second["sources"][0]["fetched_at"] == first["sources"][0]["fetched_at"]
+    assert second["sources"] == first["sources"]  # the same answers, reused
+
+
+def test_cached_answer_has_exactly_the_contract_fields():
+    # The API contract (design.md section 7) must not change: a reused answer has the
+    # same six fields as a fresh one, and nothing extra.
+    contract_fields = {"name", "display_name", "status", "summary", "raw", "error"}
+    p1, p2, p3 = fake_sources()
+    with p1, p2, p3:
+        fresh = lookup("8.8.8.8")
+        reused = lookup("8.8.8.8")
+
+    for result in (fresh, reused):
+        for source in result["sources"]:
+            assert set(source) == contract_fields
 
 
 def test_same_ip_spelled_differently_shares_one_entry():
@@ -84,10 +95,9 @@ def test_expired_entry_asks_the_source_again():
             lookup("8.8.8.8")
         assert internetdb.call_count == 1
         with at_time(1000 + 24 * HOUR):      # expired
-            result = lookup("8.8.8.8")
+            lookup("8.8.8.8")
 
     assert internetdb.call_count == 2
-    assert result["sources"][0]["cached"] is False
 
 
 def test_not_found_expires_sooner_than_a_real_answer():
@@ -105,21 +115,19 @@ def test_error_is_not_cached():
     p1, p2, p3 = fake_sources(internetdb="error")
     with p1 as internetdb, p2 as rdap, p3:
         lookup("8.8.8.8")
-        second = lookup("8.8.8.8")
+        lookup("8.8.8.8")
 
     assert internetdb.call_count == 2           # the error was asked again
     assert rdap.call_count == 1                 # the good answer next to it was reused
-    assert second["sources"][0]["cached"] is False
 
 
 def test_missing_key_is_not_cached():
     p1, p2, p3 = fake_sources(abuseipdb="not_configured")
     with p1, p2, p3 as abuseipdb:
         lookup("8.8.8.8")
-        second = lookup("8.8.8.8")
+        lookup("8.8.8.8")
 
     assert abuseipdb.call_count == 2
-    assert second["sources"][2]["fetched_at"] is None  # never actually asked
 
 
 def test_timeout_from_the_network_is_not_cached():
