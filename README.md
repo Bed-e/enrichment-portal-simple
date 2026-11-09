@@ -128,6 +128,50 @@ spent), run `python measure_calls.py` from inside `backend/`. The backend keeps 
 answer for a while and reuses it; the expiry times and reasons are in section 12 of
 [design.md](design.md).
 
+## MCP server (ask Claude Desktop about an IP)
+
+`mcp_server/server.py` lets Claude Desktop look up an IP address through the portal. It offers one
+tool, `lookup_ip`, that calls the backend's API (it never calls a source itself). The design and
+the reasons behind it are in section 13 of [design.md](design.md).
+
+It is installed with everything else by `pip install -r requirements.txt`. The backend must be
+running for lookups to work.
+
+Its tests make no network calls. Run them from inside `mcp_server/`:
+
+```
+cd mcp_server
+pytest
+```
+
+**Try it in MCP Inspector (optional).** Inspector is a web page for calling a server's tools by
+hand. It needs Node.js (for `npx`). From the project folder:
+
+```
+npx @modelcontextprotocol/inspector venv\Scripts\python.exe mcp_server\server.py
+```
+
+**Connect it to Claude Desktop.** Open `%APPDATA%\Claude\claude_desktop_config.json` (on Windows;
+Claude Desktop's Settings > Developer > Edit Config opens it) and add the server. Replace
+`C:\\path\\to` with where this project is, using double backslashes. `PORTAL_URL` is the backend's
+address; change the port if you run the backend on another one.
+
+```json
+{
+  "mcpServers": {
+    "ioc-portal": {
+      "command": "C:\\path\\to\\enrichment-portal-simple\\venv\\Scripts\\python.exe",
+      "args": ["C:\\path\\to\\enrichment-portal-simple\\mcp_server\\server.py"],
+      "env": { "PORTAL_URL": "http://127.0.0.1:5001" }
+    }
+  }
+}
+```
+
+Restart Claude Desktop, then ask something like "What's the verdict on 8.8.8.8?". No API key goes
+in this config: only the backend reads the AbuseIPDB key, from `.env`. The server's log lines go to
+stderr, which Claude Desktop saves in its MCP log files.
+
 ## Project layout
 
 | File | What it does |
@@ -144,3 +188,5 @@ answer for a while and reuses it; the expiry times and reasons are in section 12
 | `frontend/templates/index.html` | The page |
 | `frontend/static/style.css` | The styling |
 | `frontend/tests/` | Automated tests, and the recorded backend answer they replay |
+| `mcp_server/server.py` | The MCP server for Claude Desktop: one tool, `lookup_ip`, that calls the backend |
+| `mcp_server/tests/` | Automated tests, and the recorded backend answers they replay |

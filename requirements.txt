@@ -2,3 +2,5 @@ flask
 requests
 python-dotenv
 pytest
+# MCP server (mcp_server/). Version 2 only: version 1 has a different API (FastMCP).
+mcp[cli]>=2,<3
