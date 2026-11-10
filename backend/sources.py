@@ -5,13 +5,28 @@ import requests
 TIMEOUT_SECONDS = 8
 
 
+def _log_failure(url, error, headers):
+    """Print why a request failed to the backend terminal (never to the page or the JSON).
+
+    Some request errors copy header values into their message, and the AbuseIPDB key travels
+    in a header. So every header value is replaced with [hidden] before printing. The URL
+    is safe to print: it never contains the key.
+    """
+    detail = str(error)
+    for value in (headers or {}).values():
+        detail = detail.replace(str(value), "[hidden]")
+    print(f"Source request failed: {url} -> {type(error).__name__}: {detail}", flush=True)
+
+
 def _get_json(url, headers=None):
     """Make one GET request. Returns (response, error_message); exactly one is None."""
     try:
         response = requests.get(url, headers=headers, timeout=TIMEOUT_SECONDS)
-    except requests.Timeout:
+    except requests.Timeout as e:
+        _log_failure(url, e, headers)
         return None, "Request timed out"
     except requests.RequestException as e:
+        _log_failure(url, e, headers)
         return None, f"Network error: {type(e).__name__}"
     return response, None
 
