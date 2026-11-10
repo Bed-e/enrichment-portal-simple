@@ -1,205 +1,45 @@
 # IP Enrichment Portal (Simple)
 
-A small local web app. Type one IPv4 address and it shows:
+A small local web app. Type one IPv4 address and it shows a verdict (Malicious, Suspicious, etc.)
+with a 0-100 suspicion score, plus one card per source (Shodan InternetDB, RDAP and AbuseIPDB)
+with the raw response on demand. How it works: [design.md](design.md).
 
-- a **verdict** (Malicious, Suspicious, No known bad, or Not applicable for private
-  addresses) with a 0 to 100 score and the reasons listed
-- one **card per source**, with the raw response available on demand
+> Lookups go to outside services, so don't enter addresses you need to keep private.
 
-Sources: Shodan InternetDB, RDAP (registration data) and AbuseIPDB.
+## Set up
 
-The app only **reads** data. It never submits or reports anything to any service. Private and
-reserved addresses (like `192.168.1.1`) are never sent to outside services.
+Needs Python 3 (developed on 3.12) and internet access.
 
-For the full design and scope, see [design.md](design.md).
+```bash
+python -m venv venv
+venv\Scripts\activate          # macOS / Linux: source venv/bin/activate
+pip install -r requirements.txt
+```
 
-## Requirements
-
-- Python 3 (developed and tested on 3.12; other versions are untested)
-- Internet access, because the sources are queried live
-- Optional: a free AbuseIPDB API key. Without it the app still works, and the AbuseIPDB card
-  says "not configured". Create a free account at https://www.abuseipdb.com to get a key.
-
-## Install
-
-Run these from the project folder.
-
-1. Create a virtual environment. This is a private copy of Python for this project, so its
-   packages don't mix with other projects.
-
-   ```
-   python -m venv venv
-   ```
-
-2. Activate it. Your prompt should then start with `(venv)`.
-
-   - Windows PowerShell: `venv\Scripts\Activate.ps1`
-   - Windows cmd: `venv\Scripts\activate.bat`
-   - macOS / Linux: `source venv/bin/activate`
-
-3. Install the dependencies:
-
-   ```
-   pip install -r requirements.txt
-   ```
-
-## Configure (optional)
-
-Settings that must not live in the code, like API keys, go in a `.env` file in the project
-folder (the top one, next to this README). It is listed in `.gitignore`, so it is never committed.
-
-1. Copy the template:
-
-   - Windows: `copy .env.example .env`
-   - macOS / Linux: `cp .env.example .env`
-
-2. Open `.env` and replace `your-key-here` with your real AbuseIPDB key.
-
-3. `BACKEND_URL` tells the frontend where the backend is. The default already matches the
-   commands below, so change it only if you change the backend's port (see "Change the port").
-
-Never share your key or commit `.env`.
+Optional: AbuseIPDB needs a free API key (https://www.abuseipdb.com). Copy `.env.example` to
+`.env` and replace `your-key-here` with your key. `.env` is git-ignored: never commit it.
 
 ## Run
 
-The app is two programs: a **backend** (an API that queries the sources and returns JSON) and a
-**frontend** (the web page, which only talks to the backend). Run each in its own terminal, with
-the virtual environment active in both.
+Two terminals, both with the virtual environment active:
 
-Terminal 1, the backend (port 5001):
-
-```
-cd backend
-flask --app api run --port 5001
+```bash
+cd backend && flask --app api run --port 5001     # terminal 1: the backend
+cd frontend && flask --app app run --port 5000    # terminal 2: the frontend
 ```
 
-Terminal 2, the frontend (port 5000):
-
-```
-cd frontend
-flask --app app run --port 5000
-```
-
-Then open http://127.0.0.1:5000 in your browser, type an IP address (for example `8.8.8.8`),
-and press **Look up**. A lookup queries three sources one after another, so it can take a few
-seconds. Stop each server with Ctrl+C. If the backend is stopped, the page says the lookup
-service is unavailable.
-
-You can also call the backend directly. A browser or `curl.exe` will do (on Windows PowerShell, plain `curl` is a different command that
-prints a confusing summary, so use `curl.exe`; on macOS and Linux, `curl` works):
-
-```
-curl.exe http://127.0.0.1:5001/api/ip/8.8.8.8
-```
-
-The format of the answer is the API contract in section 7 of [design.md](design.md).
-
-If something goes wrong, details are printed in the terminal of the program that failed. The web
-page only shows a short, safe message. Only the backend reads the AbuseIPDB key.
-
-### Change the port
-
-Two programs can't listen on the same port. Change the number after `--port`. If you change the
-backend's port, set `BACKEND_URL` in `.env` to match, for example `BACKEND_URL=http://127.0.0.1:5003`.
-To run a second copy of the portal on the same computer, give it different ports for both
-programs (for example 5003 for the backend and 5002 for the frontend).
+Open http://127.0.0.1:5000 and type an IP such as `8.8.8.8`; a lookup can take a few seconds.
+If you change the backend's port, set `BACKEND_URL` in `.env` to match. Errors are printed in
+the terminal, never on the page.
 
 ## Test
 
-Each program has its own tests. Run `pytest` from inside its folder:
+Run `pytest` from inside `backend/` and from inside `frontend/`.
 
-```
-cd backend
-pytest
-```
+Open an issue at https://github.com/Bed-e/enrichment-portal-simple if the tests fail.
 
-```
-cd frontend
-pytest
-```
+## Use it from Claude
 
-The backend tests cover the pure logic (IP classification and verdict scoring), the source
-functions (which replay real responses saved in `backend/tests/samples/`) and the API endpoint.
-The frontend tests replay a real backend answer saved in `frontend/tests/samples/`. No test makes
-network calls.
-
-To count how many requests a fixed run of 26 lookups sends to each source (no network, no quota
-spent), run `python measure_calls.py` from inside `backend/`. The backend keeps each source's
-answer for a while and reuses it; the expiry times and reasons are in section 12 of
-[design.md](design.md).
-
-## MCP server (ask Claude Desktop about an IP)
-
-`mcp_server/server.py` lets Claude Desktop look up an IP address through the portal. It offers one
-tool, `lookup_ip`, that calls the backend's API (it never calls a source itself). The design and
-the reasons behind it are in section 13 of [design.md](design.md).
-
-It is installed with everything else by `pip install -r requirements.txt`. The backend must be
-running for lookups to work.
-
-Its tests make no network calls. Run them from inside `mcp_server/`:
-
-```
-cd mcp_server
-pytest
-```
-
-**Try it in MCP Inspector (optional).** Inspector is a web page for calling a server's tools by
-hand. It needs Node.js (for `npx`). From the project folder:
-
-```
-npx @modelcontextprotocol/inspector venv\Scripts\python.exe mcp_server\server.py
-```
-
-**Connect it to Claude Desktop.** First quit Claude Desktop fully (system tray icon, then Quit):
-while it is running it can overwrite the config file and drop your change. Then, on Windows, open
-`%APPDATA%\Claude\claude_desktop_config.json`. If you installed Claude Desktop from the Microsoft
-Store, the file is at `%LOCALAPPDATA%\Claude-Data\claude_<id>\claude_desktop_config.json` instead.
-Add the server and save. Replace
-`C:\\path\\to` with where this project is, using double backslashes. `PORTAL_URL` is the backend's
-address; change the port if you run the backend on another one.
-
-```json
-{
-  "mcpServers": {
-    "ioc-portal": {
-      "command": "C:\\path\\to\\enrichment-portal-simple\\venv\\Scripts\\python.exe",
-      "args": ["C:\\path\\to\\enrichment-portal-simple\\mcp_server\\server.py"],
-      "env": { "PORTAL_URL": "http://127.0.0.1:5001" }
-    }
-  }
-}
-```
-
-Start Claude Desktop again, then ask something like "What's the verdict on 8.8.8.8?". No API key goes
-in this config: only the backend reads the AbuseIPDB key, from `.env`. The server's log lines go to
-stderr, which Claude Desktop saves in its MCP log files.
-
-**Connect it to Claude Code.** The project already includes a `.mcp.json` file in its root folder.
-Claude Code reads that file when you open the project and offers the `ioc-portal` server, which
-the `/ioc-triage` skill needs. Three things to know:
-
-- Run `pip install -r requirements.txt` first, and keep the backend running on port 5001.
-- The file's `command` is the Windows path `venv/Scripts/python.exe`. On macOS or Linux, change it
-  to `venv/bin/python`.
-- You may be asked to approve the server the first time. It holds no secrets: only the backend
-  reads the AbuseIPDB key.
-
-## Project layout
-
-| File | What it does |
-| --- | --- |
-| `backend/api.py` | The backend: one endpoint, `GET /api/ip/<ip>`, that returns JSON |
-| `backend/lookup.py` | Runs one lookup: classify the IP, query sources, score the verdict |
-| `backend/ip_tools.py` | Checks whether an address is valid, public, private or reserved |
-| `backend/sources.py` | One function per source (Shodan InternetDB, RDAP, AbuseIPDB) |
-| `backend/verdict.py` | Turns the source results into a verdict: a 0 to 100 certainty of malicious activity, plus a level label |
-| `backend/cache.py` | Keeps each source's answer in memory for a while, so repeat lookups reuse it |
-| `backend/measure_calls.py` | Counts requests per source for a fixed run of lookups, with no network |
-| `backend/tests/` | Automated tests, and the recorded responses they replay |
-| `frontend/app.py` | The web page routes: shows the form and calls the backend |
-| `frontend/templates/index.html` | The page |
-| `frontend/static/style.css` | The styling |
-| `frontend/tests/` | Automated tests, and the recorded backend answer they replay |
-| `mcp_server/server.py` | The MCP server for Claude Desktop: one tool, `lookup_ip`, that calls the backend |
-| `mcp_server/tests/` | Automated tests, and the recorded backend answers they replay |
+The MCP server lets Claude call the backend: setup is in [mcp_server/README.md](mcp_server/README.md).
+`.claude/skills/ioc-triage/` is a skill for triaging a pasted list of values; open this folder
+in a Claude Code session to use it.
